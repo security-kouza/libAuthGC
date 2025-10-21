@@ -34,6 +34,7 @@ set(LIB
 set(SRC
     src/socket.cpp
     src/PRNG.cpp
+    src/utils.cpp
     src/EndemicOT/Endemic_OT_C.c
     src/EndemicOT/EndemicOT.cpp
     src/EndemicOT/OTTools.c
@@ -41,6 +42,7 @@ set(SRC
 set(HEADER
     include/socket.hpp
     include/PRNG.hpp
+    include/utils.hpp
     include/EndemicOT/Endemic_OT_C.h
     include/EndemicOT/EndemicOT.hpp
     include/EndemicOT/OTTools.h
@@ -61,6 +63,8 @@ if (ENABLE_TEST)
     set(TEST_NAME ${PROJECT_NAME}-test)
     set(TEST_SRC
         tests/EndemicOT.test.cpp
+        tests/io.test.cpp
+        tests/PRNG.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})

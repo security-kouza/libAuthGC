@@ -89,3 +89,9 @@ message(STATUS "  C Flags: ${CMAKE_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS} -std=c++17")
 string(STRIP ${CMAKE_CXX_FLAGS} CMAKE_CXX_FLAGS)
 message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
+
+# Compile Options
+add_compile_options(-DKYBER_90S)
+
+# RDSEED
+include(${CMAKE_SOURCE_DIR}/cmake/enable_rdseed.cmake)

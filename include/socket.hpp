@@ -1,7 +1,7 @@
 /*
 This file is part of EOTKyber of Abe-Tibouchi Laboratory, Kyoto University
-Copyright © 2023-2024  Kyoto University
-Copyright © 2023-2024  Peihao Li <li.peihao.62s@st.kyoto-u.ac.jp>
+Copyright © 2023-2025  Kyoto University
+Copyright © 2023-2025  Peihao Li <li.peihao.62s@st.kyoto-u.ac.jp>
 
 EOTKyber is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <array>
 #include <string>
 #include <boost/asio.hpp>
+#include <openssl/evp.h>
 
 namespace ATLab {
     class Socket {
@@ -31,12 +32,20 @@ namespace ATLab {
         boost::asio::io_context _ioc;
         boost::asio::ip::tcp::socket _socket;
 
+        // for SHA256
+        EVP_MD_CTX* const _mdctx;
+        static constexpr size_t DIGEST_SIZE {32};
+        static const EVP_MD* DIGEST_TYPE;
+        std::array<std::byte, DIGEST_SIZE> _digestBuf;
+
     public:
         Socket() = delete;
         Socket(Socket&) = delete;
         Socket(const std::string& address, unsigned short port);
 
-        ~Socket() = default;
+        ~Socket() {
+            EVP_MD_CTX_free(_mdctx);
+        }
 
         void accept();
         void connect(size_t MaxReconnectCnt = 5);
@@ -44,6 +53,8 @@ namespace ATLab {
 
         size_t read(void* pBuf, size_t size, const std::string& logMsg = "", bool debug = false);
         size_t write(const void* pBuf, size_t size, const std::string& logMsg = "", bool debug = false);
+
+        std::array<std::byte, DIGEST_SIZE> gen_challenge();
     };
 }
 

@@ -1,7 +1,7 @@
 /*
 This file is part of EOTKyber of Abe-Tibouchi Laboratory, Kyoto University
-Copyright © 2023-2024  Kyoto University
-Copyright © 2023-2024  Peihao Li <li.peihao.62s@st.kyoto-u.ac.jp>
+Copyright © 2023-2025  Kyoto University
+Copyright © 2023-2025  Peihao Li <li.peihao.62s@st.kyoto-u.ac.jp>
 
 EOTKyber is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -21,19 +21,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <thread>
 #include <chrono>
+#include "utils.hpp"
 
 namespace ATLab {
 
+    const EVP_MD* Socket::DIGEST_TYPE {EVP_sha256()};
+
     Socket::Socket(const std::string& address, const unsigned short port):
         _endpoint {boost::asio::ip::make_address(address), port},
-        _socket {_ioc}
-    {}
+        _socket {_ioc},
+        _mdctx {EVP_MD_CTX_new()},
+        _digestBuf {}
+    {
+        EVP_DigestInit_ex(_mdctx, DIGEST_TYPE, nullptr);
+    }
 
     void Socket::accept() {
         boost::asio::ip::tcp::acceptor{_ioc, _endpoint}.accept(_socket);
     }
 
-    void Socket::connect(size_t MaxReconnectCnt) {
+    void Socket::connect(const size_t MaxReconnectCnt) {
         size_t retryCnt {0};
         bool connected {false};
         constexpr auto baseDelayTime {std::chrono::milliseconds{5}};
@@ -63,10 +70,11 @@ namespace ATLab {
     }
 
     size_t Socket::read(void* const pBuf, const size_t size, const std::string& logMsg, const bool debug) {
-//        if (debug) {
-//            print_log("Reading: " + logMsg);
-//        }
-        boost::asio::read(_socket, boost::asio::buffer(pBuf, size));
+        if (debug) {
+            print_log("Reading: " + logMsg);
+        }
+        const auto readSize {boost::asio::read(_socket, boost::asio::buffer(pBuf, size))};
+        EVP_DigestUpdate(_mdctx, pBuf, readSize);
 #ifdef DEBUG
         if (debug) {
             std::ostringstream sout;
@@ -78,14 +86,15 @@ namespace ATLab {
             PrintMutex.unlock();
         }
 #endif // DEBUG
-        return 0;
+        return readSize;
     }
 
     size_t Socket::write(const void* pBuf, const size_t size, const std::string& logMsg, const bool debug) {
-//        if (debug) {
-//            print_log("Writing: " + logMsg);
-//        }
-        boost::asio::write(_socket, boost::asio::buffer(pBuf, size));
+        if (debug) {
+            print_log("Writing: " + logMsg);
+        }
+        const auto writtenSize {boost::asio::write(_socket, boost::asio::buffer(pBuf, size))};
+        EVP_DigestUpdate(_mdctx, pBuf, writtenSize);
 #ifdef DEBUG
         if (debug) {
             std::ostringstream sout;
@@ -97,6 +106,15 @@ namespace ATLab {
             PrintMutex.unlock();
         }
 #endif // DEBUG
-        return 0;
+        return writtenSize;
+    }
+
+    std::array<std::byte, Socket::DIGEST_SIZE> Socket::gen_challenge() {
+        unsigned int len;
+        const auto mdctx {EVP_MD_CTX_dup(_mdctx)};
+
+        EVP_DigestFinal_ex(mdctx, reinterpret_cast<unsigned char*>(_digestBuf.data()), &len);
+
+        return _digestBuf;
     }
 }
