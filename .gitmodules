@@ -1,0 +1,6 @@
+[submodule "libs/emp-ot"]
+	path = libs/emp-ot
+	url = git@github.com:E011011101001/emp-ot.git
+[submodule "libs/emp-tool"]
+	path = libs/emp-tool
+	url = git@github.com:E011011101001/emp-tool.git

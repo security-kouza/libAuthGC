@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.25)
-project(EOTKyber)
+cmake_minimum_required(VERSION 3.26)
+project(Revelio)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,12 +22,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Boost)
 
-# Kyber
+add_subdirectory(libs/emp-tool)
+add_subdirectory(libs/emp-ot)
 add_subdirectory(libs/Kyber)
+#add_subdirectory(emp-ag2pc)
 
 
 # Target
 set(LIB
+    emp-tool
+    emp-ot
+#    emp-ag2pc
     Kyber
     Boost::asio
 )
@@ -65,6 +70,8 @@ if (ENABLE_TEST)
         tests/PRNG.test.cpp
         tests/io.test.cpp
         tests/EndemicOT.test.cpp
+        tests/PRNG.test.cpp
+        tests/IKNP.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
