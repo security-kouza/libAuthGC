@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <boost/asio.hpp>
 
-#include <emp-tool/utils/hash.h>
+// #include <emp-tool/utils/hash.h>
 
 #include "socket.hpp"
 #include "utils.hpp"
@@ -58,7 +58,7 @@ TEST(ATLabSocket, hash) {
         socket.close();
     }}, client {[&clientChallenge, &msg]() {
         std::array<uint8_t, 3> buf {};
-        std::array<std::byte, 32> serverFirstThree {}, serverWholeChallenge {}, empFirst {}, empWhole {};
+        std::array<std::byte, 32> serverFirstThree {}, serverWholeChallenge {}; //, empFirst {}, empWhole {};
         ATLab::Socket socket {ADDRESS, PORT};
 
         socket.connect();
@@ -77,11 +77,11 @@ TEST(ATLabSocket, hash) {
         EXPECT_EQ(localFirstThree, serverFirstThree);
         EXPECT_EQ(localWholeChallenge, serverWholeChallenge);
 
-        emp::Hash::hash_once(empFirst.data(), msg.data(), 3);
-        emp::Hash::hash_once(empWhole.data(), msg.data(), 5);
-
-        EXPECT_EQ(localFirstThree, empFirst);
-        EXPECT_EQ(localWholeChallenge, empWhole);
+        // emp::Hash::hash_once(empFirst.data(), msg.data(), 3);
+        // emp::Hash::hash_once(empWhole.data(), msg.data(), 5);
+        //
+        // EXPECT_EQ(localFirstThree, empFirst);
+        // EXPECT_EQ(localWholeChallenge, empWhole);
     }};
     server.join();
     client.join();

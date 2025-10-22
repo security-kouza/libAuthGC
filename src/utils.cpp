@@ -49,20 +49,20 @@ namespace ATLab {
 
     }
 
-    emp::block Block(const std::array<bool, 128>& bits) {
-        auto res {static_cast<__uint128_t>(0)};
-        for (auto rit {bits.crbegin()}; rit != bits.crend(); ++rit) {
-            res <<= 1;
-            res |= *rit;
-        }
-        return as_block(res);
-    }
-
-    const emp::block& as_block(const __uint128_t& i128) {
-        return *reinterpret_cast<const emp::block*>(&i128);
-    }
-
-    const __uint128_t& as_uint128(const emp::block& block) {
-        return *reinterpret_cast<const __uint128_t*>(&block);
-    }
+    // emp::block Block(const std::array<bool, 128>& bits) {
+    //     auto res {static_cast<__uint128_t>(0)};
+    //     for (auto rit {bits.crbegin()}; rit != bits.crend(); ++rit) {
+    //         res <<= 1;
+    //         res |= *rit;
+    //     }
+    //     return as_block(res);
+    // }
+    //
+    // const emp::block& as_block(const __uint128_t& i128) {
+    //     return *reinterpret_cast<const emp::block*>(&i128);
+    // }
+    //
+    // const __uint128_t& as_uint128(const emp::block& block) {
+    //     return *reinterpret_cast<const __uint128_t*>(&block);
+    // }
 }

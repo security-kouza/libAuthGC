@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <mutex>
 #include <iostream>
 #include <vector>
-#include <emp-tool/utils/block.h>
+// #include <emp-tool/utils/block.h>
 
 #include "PRNG.hpp"
 
@@ -47,12 +47,12 @@ namespace ATLab {
         print_bytes(buf.data(), N);
     }
 
-    // conversion to emp::block (__mm128i)
-    emp::block Block(const std::array<bool, 128>&);
-
-    static_assert(sizeof(emp::block) == sizeof(__uint128_t));
-    const emp::block& as_block(const __uint128_t&);
-    const __uint128_t& as_uint128(const emp::block&);
+    // // conversion to emp::block (__mm128i)
+    // emp::block Block(const std::array<bool, 128>&);
+    //
+    // static_assert(sizeof(emp::block) == sizeof(__uint128_t));
+    // const emp::block& as_block(const __uint128_t&);
+    // const __uint128_t& as_uint128(const emp::block&);
 }
 
 #endif // REVELIO_UTILS

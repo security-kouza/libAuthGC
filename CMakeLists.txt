@@ -62,9 +62,9 @@ if (ENABLE_TEST)
 
     set(TEST_NAME ${PROJECT_NAME}-test)
     set(TEST_SRC
-        tests/EndemicOT.test.cpp
-        tests/io.test.cpp
         tests/PRNG.test.cpp
+        tests/io.test.cpp
+        tests/EndemicOT.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
