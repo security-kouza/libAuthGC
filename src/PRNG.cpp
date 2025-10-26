@@ -20,20 +20,39 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "PRNG.hpp"
 
 #include <cassert>
+#include <random>
 
 extern "C" {
 #include <rng.h>
 }
 
 namespace ATLab {
-    PRNG_Kyber& PRNG_Kyber::get_PRNG_Kyber(std::array<uint8_t, 48> seed) {
+    PRNG_Kyber& PRNG_Kyber::get_PRNG_Kyber() {
         static PRNG_Kyber KyberInstance; // state stored in rng.c
         static bool firstInvocation {true};
         if (!firstInvocation) {
             return KyberInstance;
         }
 
-        randombytes_init(seed.data(), nullptr, 0); // since `security_strength` is ignored. Bad design :(
+        constexpr size_t SEED_BYTES {48};
+        constexpr size_t INT_ARR_SIZE {SEED_BYTES / sizeof(unsigned int)};
+        std::array<unsigned int, INT_ARR_SIZE> seed {};
+        std::random_device rd{"/dev/urandom"};
+
+        for (auto& r : seed) {
+            r = rd();
+        }
+
+#ifdef DEBUG_FIXED_SEED
+        seed = {0};
+#endif // DEBUG_FIXED_SEED
+
+        // needs a 48-byte-long seed
+        randombytes_init(
+            reinterpret_cast<unsigned char*>(seed.data()),
+            nullptr,
+            0 // since `security_strength` is ignored. Bad design :(
+        );
         firstInvocation = false;
         return KyberInstance;
     }

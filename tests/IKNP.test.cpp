@@ -16,9 +16,7 @@ const std::string ADDRESS {"127.0.0.1"};
 constexpr unsigned short PORT {12345};
 
 TEST(IKNP, ManualContor) {
-
     std::array<emp::block, 128> k0 {}, k1 {}, k {};
-
     std::array<bool, 128> b {ATLab::random_bool_array<128>()};
 
     auto COTChoices {ATLab::random_bool_array<COT_SIZE>()};

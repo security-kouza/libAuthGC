@@ -93,5 +93,9 @@ message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 # Compile Options
 add_compile_options(-DKYBER_90S)
 
+if(DEBUG_FIXED_SEED)
+    add_compile_options(-DDEBUG_FIXED_SEED)
+endif(DEBUG_FIXED_SEED)
+
 # RDSEED
 include(${CMAKE_SOURCE_DIR}/cmake/enable_rdseed.cmake)

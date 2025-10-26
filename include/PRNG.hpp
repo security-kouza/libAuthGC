@@ -31,11 +31,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace ATLab {
 
-    /**
-     * Usage:
-     *
-     */
-
     // Singleton, since Kyber/rng.c uses a global variable to store the inner state
     class PRNG_Kyber {
     public:
@@ -47,9 +42,11 @@ namespace ATLab {
     public:
         static constexpr size_t SEED_LENGTH {48}; // Size of argument `entropy_input` of `randombytes` in Kyber
 
-        // At first invocation, init Kyber rng with seed
-        // After
-        static PRNG_Kyber& get_PRNG_Kyber(std::array<uint8_t, 48> seed = {0});
+        /**
+         * Singleton getter for PRNG_Kyber.
+         * Use a seed generated from `/dev/urandom`. If macro `DEBUG` defined, use an all-0 seed.
+         */
+        static PRNG_Kyber& get_PRNG_Kyber();
 
         static constexpr result_type min() { return 0; }
         static constexpr result_type max() {

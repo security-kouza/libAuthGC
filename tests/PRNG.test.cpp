@@ -1,10 +1,12 @@
 #include <array>
+#include <iostream>
 
 #include <gtest/gtest.h>
 
 #include "PRNG.hpp"
 
 TEST(PRNG, Default_Seed) {
+#ifdef DEBUG_FIXED_SEED
     using namespace ATLab;
     auto prng {PRNG_Kyber::get_PRNG_Kyber()};
     const auto randInt {prng()};
@@ -16,4 +18,7 @@ TEST(PRNG, Default_Seed) {
 
     const auto secondRandInt {PRNG_Kyber::get_PRNG_Kyber()()};
     EXPECT_NE(randInt, secondRandInt);
+#else
+    std::clog << "Seed is randomized. Skipping...\n";
+#endif // DEBUG_FIXED_SEED
 }

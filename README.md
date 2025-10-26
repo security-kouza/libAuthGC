@@ -29,3 +29,7 @@ The test binary `EOTKyber-test` is built under `build/bin` (or other `<path-to-b
 
 2. `EndemicOT.BatchTest`: A test with a performance benchmark for the `EndemicOT::batch_send` and `EndemicOT::batch_receive` functions, which integrates with the `Socket` class to batch execute the OT protocol. Each party is given a single thread and benchmarked separately. Messages between the parties are passed via local TCP socket(, which is provided by the `Socket` class).
 
+## Other Notes
+
+If macro `DEBUG_FIXED_SEED` is defined, seed `0` is used. 
+Use of `ENABLE_RDSEED` is deprecated, since most Linux distributions already use `RDSEED` and other hardware randomness to seed `/dev/urandom`.
