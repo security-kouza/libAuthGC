@@ -4,3 +4,6 @@
 [submodule "libs/emp-tool"]
 	path = libs/emp-tool
 	url = git@github.com:E011011101001/emp-tool.git
+[submodule "libs/emp-ag2pc"]
+	path = libs/emp-ag2pc
+	url = git@github.com:E011011101001/emp-ag2pc.git
