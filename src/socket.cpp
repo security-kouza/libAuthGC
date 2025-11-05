@@ -30,8 +30,7 @@ namespace ATLab {
     Socket::Socket(const std::string& address, const unsigned short port):
         _endpoint {boost::asio::ip::make_address(address), port},
         _socket {_ioc},
-        _mdctx {EVP_MD_CTX_new()},
-        _digestBuf {}
+        _mdctx {EVP_MD_CTX_new()}
     {
         EVP_DigestInit_ex(_mdctx, DIGEST_TYPE, nullptr);
     }
@@ -111,10 +110,11 @@ namespace ATLab {
         return writtenSize;
     }
 
-    std::array<std::byte, Socket::DIGEST_SIZE> Socket::gen_challenge() {
+    std::array<std::byte, Socket::DIGEST_SIZE> Socket::gen_challenge() const {
         unsigned int len;
         const auto mdctx {EVP_MD_CTX_dup(_mdctx)};
 
+        std::array<std::byte, DIGEST_SIZE> _digestBuf {};
         EVP_DigestFinal_ex(mdctx, reinterpret_cast<unsigned char*>(_digestBuf.data()), &len);
 
         return _digestBuf;

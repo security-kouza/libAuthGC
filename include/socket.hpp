@@ -37,9 +37,7 @@ namespace ATLab {
         EVP_MD_CTX* const _mdctx;
     public:
         static constexpr size_t DIGEST_SIZE {32};
-    private:
         static const EVP_MD* DIGEST_TYPE;
-        std::array<std::byte, DIGEST_SIZE> _digestBuf;
 
     public:
         Socket() = delete;
@@ -57,7 +55,7 @@ namespace ATLab {
         size_t read(void* pBuf, size_t size, const std::string& logMsg = "", bool debug = false);
         size_t write(const void* pBuf, size_t size, const std::string& logMsg = "", bool debug = false);
 
-        std::array<std::byte, DIGEST_SIZE> gen_challenge();
+        std::array<std::byte, DIGEST_SIZE> gen_challenge() const;
     };
 
     // Wrapper for ATLab::Socket
