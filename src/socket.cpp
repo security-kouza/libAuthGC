@@ -38,6 +38,7 @@ namespace ATLab {
 
     void Socket::accept() {
         boost::asio::ip::tcp::acceptor{_ioc, _endpoint}.accept(_socket);
+        _socket.set_option(boost::asio::ip::tcp::no_delay{true});
     }
 
     void Socket::connect(const size_t MaxReconnectCnt) {
@@ -47,6 +48,7 @@ namespace ATLab {
         while (!connected) {
             try {
                 _socket.connect(_endpoint);
+                _socket.set_option(boost::asio::ip::tcp::no_delay{true});
                 connected = true;
             } catch (const std::exception& e) {
                 if (retryCnt >= MaxReconnectCnt) {
