@@ -25,6 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <boost/asio.hpp>
 #include <openssl/evp.h>
+#include "emp-tool/io/io_channel.h"
 
 namespace ATLab {
     class Socket {
@@ -34,7 +35,9 @@ namespace ATLab {
 
         // for SHA256
         EVP_MD_CTX* const _mdctx;
+    public:
         static constexpr size_t DIGEST_SIZE {32};
+    private:
         static const EVP_MD* DIGEST_TYPE;
         std::array<std::byte, DIGEST_SIZE> _digestBuf;
 
@@ -55,6 +58,43 @@ namespace ATLab {
         size_t write(const void* pBuf, size_t size, const std::string& logMsg = "", bool debug = false);
 
         std::array<std::byte, DIGEST_SIZE> gen_challenge();
+    };
+
+    // Wrapper for ATLab::Socket
+    class IO : public emp::IOChannel<IO> {
+    public:
+        enum Role {
+            CLIENT,
+            SERVER
+        };
+
+        IO(Role role, const std::string& address, unsigned short port, size_t maxReconnectCnt = 5);
+        IO(bool isServer, const std::string& address, int port, bool /*quiet*/ = true, size_t maxReconnectCnt = 5);
+        ~IO();
+
+        bool is_server() const;
+        void flush();
+        void sync();
+
+        std::string addr;
+        int port;
+
+        static constexpr size_t DIGEST_SIZE {Socket::DIGEST_SIZE};
+
+    private:
+        Socket _socket;
+        Role _role;
+        size_t _maxReconnectCnt;
+
+        void open();
+
+    public:
+        void send_data_internal(const void* data, size_t len);
+        void recv_data_internal(void* data, size_t len);
+
+        std::array<std::byte, DIGEST_SIZE> gen_challenge() {
+            return _socket.gen_challenge();
+        }
     };
 }
 

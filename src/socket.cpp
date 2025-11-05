@@ -117,4 +117,64 @@ namespace ATLab {
 
         return _digestBuf;
     }
+
+    IO::IO(const IO::Role role, const std::string& address, const unsigned short portValue, const size_t maxReconnectCnt)
+        : addr(address),
+          port(static_cast<int>(portValue)),
+          _socket(address, portValue),
+          _role(role),
+          _maxReconnectCnt(maxReconnectCnt) {
+        open();
+    }
+
+    IO::IO(const bool isServer, const std::string& address, const int portValue, const bool /*quiet*/, const size_t maxReconnectCnt)
+        : IO(isServer ? IO::SERVER : IO::CLIENT, address, static_cast<unsigned short>(portValue), maxReconnectCnt) {}
+
+    IO::~IO() {
+        try {
+            _socket.close();
+        } catch (...) {
+        }
+    }
+
+    bool IO::is_server() const {
+        return _role == IO::SERVER;
+    }
+
+    void IO::flush() {
+        // Boost.Asio socket writes are blocking; nothing buffered here.
+    }
+
+    void IO::sync() {
+        std::array<std::byte, 1> token {};
+        if (is_server()) {
+            send_data_internal(token.data(), token.size());
+            recv_data_internal(token.data(), token.size());
+        } else {
+            recv_data_internal(token.data(), token.size());
+            send_data_internal(token.data(), token.size());
+        }
+    }
+
+    void IO::open() {
+        if (is_server()) {
+            _socket.accept();
+        } else {
+            _socket.connect(_maxReconnectCnt);
+        }
+    }
+
+    void IO::send_data_internal(const void* const data, const size_t len) {
+        if (len == 0) {
+            return;
+        }
+        _socket.write(data, len);
+    }
+
+    void IO::recv_data_internal(void* const data, const size_t len) {
+        if (len == 0) {
+            return;
+        }
+        _socket.read(data, len);
+    }
 }
