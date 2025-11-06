@@ -26,6 +26,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <socket.hpp>
 
+#include <emp-tool/io/net_io_channel.h>
+
 namespace ATLab::EndemicOT {
 
     /** For Usage:
@@ -85,9 +87,23 @@ extern "C" {
         size_t          length
     );
 
+    void batch_send(
+        emp::NetIO&         io,
+        const emp::block*   data0,
+        const emp::block*   data1,
+        size_t              length
+    );
+
     void batch_receive(
         ATLab::Socket&  socket,
         __m128i*        data,
+        const bool*     choices,
+        size_t          length
+    );
+
+    void batch_receive(
+        emp::NetIO&     io,
+        emp::block*     data,
         const bool*     choices,
         size_t          length
     );

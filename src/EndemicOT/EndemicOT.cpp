@@ -100,6 +100,21 @@ namespace ATLab::EndemicOT {
         }
     }
 
+    void batch_send(emp::NetIO& io, const emp::block* data0, const emp::block* data1, const size_t length) {
+        Sender::Data d0, d1;
+        for (size_t i{0}; i != length; ++i) {
+            // resetting the last 128 bits is not necessary since `recv` does not use those uninitialized bits
+            memcpy(&d0, &data0[i], sizeof(__m128i));
+            memcpy(&d1, &data1[i], sizeof(__m128i));
+            Sender sender(d0, d1);
+            ReceiverMsg rMsg;
+            io.recv_data(&rMsg, sizeof(rMsg));
+            auto sMsg{sender.encrypt_with(rMsg)};
+            io.send_data(&sMsg, sizeof(sMsg));
+        }
+    }
+
+
     void batch_receive(
         ATLab::Socket& socket,
         __m128i* const data,
@@ -116,4 +131,17 @@ namespace ATLab::EndemicOT {
             memcpy(&data[i], &decryptedData, sizeof(__m128i));
         }
     }
+
+    void batch_receive(emp::NetIO& io, emp::block* data, const bool* const choices, const size_t length) {
+        for (size_t i{0}; i != length; ++i) {
+            Receiver receiver(choices[i]);
+            auto rMsg{receiver.get_receiver_msg()};
+            io.send_data(&rMsg, sizeof(rMsg));
+            SenderMsg sMsg;
+            io.recv_data(&sMsg, sizeof(sMsg));
+            auto decryptedData{receiver.decrypt_chosen(sMsg)};
+            memcpy(&data[i], &decryptedData, sizeof(__m128i));
+        }
+    }
+
 }
