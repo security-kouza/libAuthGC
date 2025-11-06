@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Simple Circuit" type="CompoundRunConfigurationType">
+    <toRun name="simple_circuit-client" type="CMakeRunConfiguration" />
+    <toRun name="simple_circuit-server" type="CMakeRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>
