@@ -94,6 +94,12 @@ extern "C" {
         size_t              length
     );
 
+    void batch_send_128(
+        emp::NetIO&         io,
+        const emp::block*   data0,
+        const emp::block*   data1
+    );
+
     void batch_receive(
         ATLab::Socket&  socket,
         __m128i*        data,
@@ -106,6 +112,12 @@ extern "C" {
         emp::block*     data,
         const bool*     choices,
         size_t          length
+    );
+
+    void batch_receive_128(
+        emp::NetIO&     io,
+        emp::block*     data,
+        const bool*     choices
     );
 }
 

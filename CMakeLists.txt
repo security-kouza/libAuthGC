@@ -32,6 +32,7 @@ add_subdirectory(libs/emp-ag2pc)
 set(LIB
     emp-tool
     emp-ot
+    emp-ot-original
     emp-ag2pc
     Kyber
     Boost::asio
