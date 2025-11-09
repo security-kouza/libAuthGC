@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Passive Ferret" type="CompoundRunConfigurationType">
+    <toRun name="passive-ferret-client" type="CMakeRunConfiguration" />
+    <toRun name="passive-ferret-server" type="CMakeRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>

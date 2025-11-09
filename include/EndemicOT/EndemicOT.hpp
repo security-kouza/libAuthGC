@@ -63,6 +63,7 @@ extern "C" {
     };
 
     class Sender {
+        // TODO: Space optimization possible
     public:
         using Data = DataBlock;
     private:
@@ -94,11 +95,31 @@ extern "C" {
         size_t              length
     );
 
-    void batch_send_128(
-        emp::NetIO&         io,
-        const emp::block*   data0,
-        const emp::block*   data1
-    );
+    // Stack allocation. Preferred.
+    template <size_t LEN>
+    void batch_send(emp::NetIO& io, const emp::block* data0, const emp::block* data1) {
+        // resetting the last 128 bits is not necessary since `recv` does not use those uninitialized bits
+        std::vector<Sender> senders;
+        senders.reserve(LEN);
+
+        for (size_t i{0}; i != LEN; ++i) {
+            // treat the first 128 bits of data0[i], data1[i] as Sender::Data
+            senders.emplace_back(
+                *reinterpret_cast<const Sender::Data*>(data0+i),
+                *reinterpret_cast<const Sender::Data*>(data1+i)
+            );
+        }
+
+        std::array<ReceiverMsg,LEN> rMsgs {};
+        io.recv_data(&rMsgs, sizeof(rMsgs));
+
+        std::array<SenderMsg,LEN> sMsgs;
+        for (size_t i {0}; i != LEN; ++i) {
+            sMsgs.at(i) = senders.at(i).encrypt_with(rMsgs.at(i));
+        }
+        io.send_data(sMsgs.data(), sizeof(SenderMsg) * LEN);
+    }
+
 
     void batch_receive(
         ATLab::Socket&  socket,
@@ -114,11 +135,28 @@ extern "C" {
         size_t          length
     );
 
-    void batch_receive_128(
-        emp::NetIO&     io,
-        emp::block*     data,
-        const bool*     choices
-    );
+    // Stack allocation. Preferred.
+    template <size_t LEN>
+    void batch_receive(emp::NetIO& io, emp::block* data, const bool* const choices) {
+        std::vector<Receiver> receivers;
+        receivers.reserve(LEN);
+        for (size_t i{0}; i != LEN; ++i) {
+            receivers.emplace_back(choices[i]);
+        }
+        std::array<ReceiverMsg,LEN> rMsgs {};
+        for (size_t i {0}; i != LEN; ++i) {
+            rMsgs.at(i) = receivers.at(i).get_receiver_msg();
+        }
+        io.send_data(&rMsgs, sizeof(rMsgs));
+
+        std::array<SenderMsg, LEN> sMsgs {};
+        io.recv_data(&sMsgs, sizeof(sMsgs));
+        for (size_t i {0}; i != LEN; ++i) {
+            auto& receiver {receivers.at(i)};
+            auto decryptedData {receiver.decrypt_chosen(sMsgs.at(i))};
+            memcpy(&data[i], &decryptedData, sizeof(__m128i));
+        }
+    }
 }
 
 #endif
