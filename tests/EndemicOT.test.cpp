@@ -204,7 +204,6 @@ TEST(EndemicOT, emp_BatchTest) {
             const auto end {std::chrono::high_resolution_clock::now()};
             durationSender = end - start;
 
-            senderChallenge = io.gen_challenge();
         }
     }, receiver {
         [&data, &choices, &durationReceiver, &receiverChallenge]() {
@@ -218,7 +217,6 @@ TEST(EndemicOT, emp_BatchTest) {
             const auto end {std::chrono::high_resolution_clock::now()};
             durationReceiver = end - start;
 
-            receiverChallenge = io.gen_challenge();
         }
     };
 

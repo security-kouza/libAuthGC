@@ -52,6 +52,7 @@ set(HEADER
     include/EndemicOT/Endemic_OT_C.h
     include/EndemicOT/EndemicOT.hpp
     include/EndemicOT/OTTools.h
+    include/block_correlated_OT.hpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})
@@ -73,6 +74,7 @@ if (ENABLE_TEST)
         tests/EndemicOT.test.cpp
         tests/PRNG.test.cpp
         tests/IKNP.test.cpp
+        tests/bCOT.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
