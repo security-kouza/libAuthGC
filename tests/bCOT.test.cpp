@@ -24,7 +24,6 @@ TEST(BCOT, DEFAULT) {
     std::vector<emp::block> localKeys;
     std::vector<bool> choices;
     std::vector<emp::block> macArr;
-    std::mutex mtx;
 
     std::thread bCOTSenderThread{
                     [&]() {

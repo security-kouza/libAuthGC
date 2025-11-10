@@ -9,6 +9,9 @@
 
 // using IKNP
 namespace ATLab::BlockCorrelatedOT {
+
+    // TODO: possible optimization: making OT shared across IKNP instances
+
     using OT = emp::IKNP<emp::NetIO>;
 
     class Sender {

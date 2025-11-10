@@ -44,6 +44,7 @@ set(SRC
     src/EndemicOT/Endemic_OT_C.c
     src/EndemicOT/EndemicOT.cpp
     src/EndemicOT/OTTools.c
+    include/global_key_sampling.hpp
 )
 set(HEADER
     include/socket.hpp
@@ -75,6 +76,7 @@ if (ENABLE_TEST)
         tests/PRNG.test.cpp
         tests/IKNP.test.cpp
         tests/bCOT.test.cpp
+        tests/global_key_sampling.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
