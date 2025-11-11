@@ -16,13 +16,13 @@ namespace ATLab::BlockCorrelatedOT {
 
     class Sender {
         const std::vector<emp::block> _deltaArr;
-        const size_t _deltaArrSize;
         OT _ot;
     public:
+        const size_t deltaArrSize;
         Sender(emp::NetIO& io, const std::vector<emp::block>& deltaArr) :
             _deltaArr(deltaArr),
-            _deltaArrSize {_deltaArr.size()},
-            _ot {&io, false}
+            _ot {&io, false},
+            deltaArrSize {_deltaArr.size()}
         {
             _ot.setup_send();
         }
@@ -48,28 +48,33 @@ namespace ATLab::BlockCorrelatedOT {
             _ot.send(k1Vec.data(), k2Vec.data(), otSize);
             return k1Vec;
         }
+
+        const emp::block& get_delta(const size_t i) const {
+            return _deltaArr.at(i);
+        }
     };
 
     class Receiver {
-        const size_t _deltaArrSize; // L
         OT _ot;
     public:
+        const size_t deltaArrSize; // L
+
         Receiver(emp::NetIO& io, const size_t deltaArrSize) :
-            _deltaArrSize {deltaArrSize},
-            _ot {&io, false}
+            _ot {&io, false},
+            deltaArrSize {deltaArrSize}
         {
             _ot.setup_recv();
         }
 
         std::tuple<std::vector<bool>, std::vector<emp::block>> extend(const size_t len) {
-            const size_t otSize{len * _deltaArrSize};
+            const size_t otSize{len * deltaArrSize};
             std::vector<bool> choices{random_bool_vector(len)};
             std::vector<emp::block> macArr(otSize);
 
             // Use regular bool array instead of vector<bool>
             bool* choicesForOT = new bool[otSize];
             // repeatedly copy choices to choicesForOT
-            for (size_t i{0}; i != _deltaArrSize; ++i) {
+            for (size_t i{0}; i != deltaArrSize; ++i) {
                 for (size_t j = 0; j < len; ++j) {
                     choicesForOT[i * len + j] = choices[j];
                 }
