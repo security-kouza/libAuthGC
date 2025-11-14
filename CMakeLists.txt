@@ -76,6 +76,7 @@ if (ENABLE_TEST)
         tests/PRNG.test.cpp
         tests/IKNP.test.cpp
         tests/bCOT.test.cpp
+        tests/authed_bit.test.cpp
         tests/global_key_sampling.test.cpp
     )
 

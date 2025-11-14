@@ -28,6 +28,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "PRNG.hpp"
 
 namespace ATLab {
+    static_assert(sizeof(emp::block) == sizeof(__uint128_t));
+
     // Must be locked before printing anything
     // (No big deal. Just for debug message format)
     extern std::mutex PrintMutex;
@@ -47,12 +49,35 @@ namespace ATLab {
         print_bytes(buf.data(), N);
     }
 
-    // conversion to emp::block (__mm128i)
+    // Little Endian.
     emp::block Block(const std::array<bool, 128>&);
 
-    static_assert(sizeof(emp::block) == sizeof(__uint128_t));
-    const emp::block& as_block(const __uint128_t&);
-    const __uint128_t& as_uint128(const emp::block&);
+    // Little Endian.
+    emp::block Block(const std::vector<bool>&);
+
+    // Little Endian.
+    emp::block Block(const bool*);
+
+    inline emp::block as_block(const __uint128_t& i128) {
+        const auto lo {static_cast<uint64_t>(i128)};
+        const auto hi {static_cast<uint64_t>(i128 >> 64)};
+        return _mm_set_epi64x(static_cast<long long>(hi), static_cast<long long>(lo));
+    }
+
+    inline __uint128_t as_uint128(emp::block b) {
+        const auto lo {static_cast<uint64_t>(_mm_cvtsi128_si64(b))};
+        const auto hi {static_cast<uint64_t>(_mm_extract_epi64(b, 1))};
+        return (static_cast<__uint128_t>(hi) << 64) | lo;
+    }
+
+    // const emp::block& as_block(const __uint128_t&);
+    // const __uint128_t& as_uint128(const emp::block&);
+
+    /**
+     * Computes the polynomial evaluation using the provided coefficients in a Galois field.
+     * @param coeff Pointer to an array of 128 coefficients. Little-endian required (coeff[i] * X^i).
+     */
+    emp::block polyval(const emp::block* coeff);
 }
 
 #endif // REVELIO_UTILS

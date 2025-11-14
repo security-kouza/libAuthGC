@@ -5,6 +5,20 @@
 #include <iostream>
 #include <iomanip>
 
+#include <emp-tool/utils/f2k.h>
+
+namespace {
+    template <class BitArray>
+    emp::block make_block_from_bits_128(BitArray bit) {
+        uint64_t high {0}, low {0};
+        for (int i = 0; i != 64; ++i) {
+            low  |= (static_cast<uint64_t>(bit[i]) << i);
+            high |= (static_cast<uint64_t>(bit[i + 64]) << i);
+        }
+        return emp::makeBlock(high, low);
+    }
+}
+
 namespace ATLab {
     std::mutex PrintMutex;
 
@@ -50,19 +64,32 @@ namespace ATLab {
     }
 
     emp::block Block(const std::array<bool, 128>& bits) {
-        auto res {static_cast<__uint128_t>(0)};
-        for (auto rit {bits.crbegin()}; rit != bits.crend(); ++rit) {
-            res <<= 1;
-            res |= *rit;
+        return make_block_from_bits_128(bits);
+    }
+
+    emp::block Block(const std::vector<bool>& bits) {
+        if (bits.size() != 128) {
+            throw std::invalid_argument("vector must contain exactly 128 bits");
         }
-        return as_block(res);
+        return make_block_from_bits_128(bits);
     }
 
-    const emp::block& as_block(const __uint128_t& i128) {
-        return *reinterpret_cast<const emp::block*>(&i128);
+    emp::block Block(const bool* bits) {
+        return make_block_from_bits_128(bits);
     }
 
-    const __uint128_t& as_uint128(const emp::block& block) {
-        return *reinterpret_cast<const __uint128_t*>(&block);
+    // const emp::block& as_block(const __uint128_t& i128) {
+    //     return *reinterpret_cast<const emp::block*>(&i128);
+    // }
+
+    // const __uint128_t& as_uint128(const emp::block& block) {
+    //     return *reinterpret_cast<const __uint128_t*>(&block);
+    // }
+
+    emp::block polyval(const emp::block* coeff) {
+        emp::block res;
+        const static emp::GaloisFieldPacking encoder;
+        encoder.packing(&res, coeff);
+        return res;
     }
 }

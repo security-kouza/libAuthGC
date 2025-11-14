@@ -36,9 +36,9 @@ namespace ATLab::BlockCorrelatedOT {
         std::vector<emp::block> extend(const size_t len) {
             const size_t otSize {len * _deltaArr.size()};
             std::vector<emp::block> k1Vec(otSize), k2Vec(otSize);
-            auto prg = ATLab::PRNG_Kyber::get_PRNG_Kyber();
+            auto prg = PRNG_Kyber::get_PRNG_Kyber();
             for (auto& k1 : k1Vec) {
-                k1 = ATLab::as_block(prg());
+                k1 = as_block(prg());
             }
             for (size_t i {0}; i != _deltaArr.size(); ++i) {
                 for (size_t j {0}; j != len; ++j) {
@@ -51,6 +51,10 @@ namespace ATLab::BlockCorrelatedOT {
 
         const emp::block& get_delta(const size_t i) const {
             return _deltaArr.at(i);
+        }
+
+        const std::vector<emp::block>& get_delta_arr() const {
+            return _deltaArr;
         }
     };
 
