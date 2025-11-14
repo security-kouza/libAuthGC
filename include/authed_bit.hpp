@@ -11,9 +11,9 @@
 namespace ATLab {
     class ITMacBlocks {
         std::vector<emp::block> _macs;
-        const size_t _size;
+        const size_t _size; // global key size
+        emp::block _block;
     public:
-        const emp::block block;
 
         /**
          *
@@ -22,7 +22,7 @@ namespace ATLab {
          */
         ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, const size_t deltaArrSize):
             _size(deltaArrSize),
-            block {Block(bits)}
+            _block {Block(bits)}
         {
             if (bits.size() != 128 || macs.size() != 128 * deltaArrSize) {
                 throw std::invalid_argument{"Wrong parameter sizes."};
@@ -34,32 +34,48 @@ namespace ATLab {
             }
         }
 
-        size_t size() const {
+        // `Fix` for a block
+        ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, const emp::block& blockToAuth);
+
+        size_t global_key_size() const {
             return _size;
+        }
+
+        const emp::block& get_block() const {
+            return _block;
         }
 
         const emp::block& get_mac(const size_t pos) const {
             return _macs.at(pos);
         }
+
+        // block ^= 1, macs unchanged
+        void flip_block_lsb() {
+            _block = _mm_xor_si128(_block, _mm_set_epi64x(0, 1));
+        }
     };
 
     class ITMacBlockKeys {
-        const size_t SIZE;
         std::vector<emp::block> _localKeys;
         std::vector<emp::block> _globalKeys;
     public:
-        ITMacBlockKeys (const std::vector<emp::block>& localKeys, std::vector<emp::block> globalKeys):
-            SIZE {localKeys.size() / globalKeys.size()},
+        ITMacBlockKeys(const std::vector<emp::block>& localKeys, std::vector<emp::block> globalKeys):
             _globalKeys {std::move(globalKeys)}
         {
-            _localKeys.reserve(SIZE);
+            if (localKeys.size() != 128 * _globalKeys.size()) {
+                throw std::invalid_argument{"Size of localKeys per global key is not 128."};
+            }
+            _localKeys.reserve(globalKeys.size());
             for (size_t i {0}; i != _globalKeys.size(); ++i) {
-                _localKeys.push_back(polyval(localKeys.data() + i * SIZE));
+                _localKeys.push_back(polyval(localKeys.data() + i * 128));
             }
         }
 
-        size_t size() const {
-            return SIZE;
+        // `Fix` for a block
+        ITMacBlockKeys(emp::NetIO&, BlockCorrelatedOT::Sender&);
+
+        size_t global_key_size() const {
+            return _globalKeys.size();
         }
 
         const emp::block& get_local_key(const size_t pos) const {
@@ -67,6 +83,13 @@ namespace ATLab {
         }
         const emp::block& get_global_key(const size_t pos) const {
             return _globalKeys.at(pos);
+        }
+
+        // adding authenticated 1
+        void flip_block_lsb() {
+            for (size_t i {0}; i != global_key_size(); ++i) {
+                _localKeys.at(i) = _mm_xor_si128(_localKeys.at(i), _globalKeys.at(i));
+            }
         }
     };
 
@@ -146,13 +169,13 @@ namespace ATLab {
         }
     };
 
-    class ITMacKeys {
+    class ITMacBitKeys {
         std::vector<emp::block> _localKeys;
         std::vector<emp::block> _globalKeys;
 
     public:
-        ITMacKeys() = delete;
-        ITMacKeys(std::vector<emp::block>&& localKeys, std::vector<emp::block> globalKeys):
+        ITMacBitKeys() = delete;
+        ITMacBitKeys(std::vector<emp::block>&& localKeys, std::vector<emp::block> globalKeys):
             _localKeys {std::move(localKeys)},
             _globalKeys {std::move(globalKeys)}
         {
@@ -170,9 +193,9 @@ namespace ATLab {
          * _bits will not be available.
          * @param len Number of bits to generate.
          */
-        ITMacKeys(BlockCorrelatedOT::Sender& bCOTSender, const size_t len):
-            ITMacKeys {[&bCOTSender, len]() -> ITMacKeys {
-                return ITMacKeys {
+        ITMacBitKeys(BlockCorrelatedOT::Sender& bCOTSender, const size_t len):
+            ITMacBitKeys {[&bCOTSender, len]() -> ITMacBitKeys {
+                return ITMacBitKeys {
                     bCOTSender.extend(len),
                     bCOTSender.get_delta_arr()
                 };
@@ -183,8 +206,8 @@ namespace ATLab {
          * Fixed ITMacKey constructor, the `Fix` procedure defined in CYYW23.
          * @param bitsSize size of bits to be fixed
          */
-        ITMacKeys(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender, const size_t bitsSize):
-            ITMacKeys{bCOTSender, bitsSize}
+        ITMacBitKeys(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender, const size_t bitsSize):
+            ITMacBitKeys{bCOTSender, bitsSize}
         {
             auto* diffArr {new bool[bitsSize]};
             io.recv_data(diffArr, sizeof(bool) * bitsSize);

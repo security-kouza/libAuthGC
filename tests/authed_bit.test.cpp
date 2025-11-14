@@ -24,14 +24,14 @@ TEST(Authed_Bit, random_bits) {
         delta = ATLab::as_block(prng());
     }
 
-    std::unique_ptr<ATLab::ITMacKeys> keys;
+    std::unique_ptr<ATLab::ITMacBitKeys> keys;
     std::unique_ptr<ATLab::ITMacBits> bits;
 
     std::thread bCOTSenderThread{
                     [&]() {
                         emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
                         ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-                        keys = std::make_unique<ATLab::ITMacKeys>(sender, BitSize);
+                        keys = std::make_unique<ATLab::ITMacBitKeys>(sender, BitSize);
                     }
                 }, bCOTReceiverThread{
                     [&]() {
@@ -77,14 +77,14 @@ TEST(Authed_Bit, fixed_bits) {
     std::vector<bool> bitsToFix {ATLab::random_bool_vector(BitSize)};
 
 
-    std::unique_ptr<ATLab::ITMacKeys> keys;
+    std::unique_ptr<ATLab::ITMacBitKeys> keys;
     std::unique_ptr<ATLab::ITMacBits> bits;
 
     std::thread bCOTSenderThread{
         [&]() {
             emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
             ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacKeys>(io, sender, BitSize);
+            keys = std::make_unique<ATLab::ITMacBitKeys>(io, sender, BitSize);
         }
     }, bCOTReceiverThread{
         [&]() {
@@ -131,14 +131,14 @@ TEST(Authed_Bit, authed_blocks) {
         delta = ATLab::as_block(prng());
     }
 
-    std::unique_ptr<ATLab::ITMacKeys> keys;
+    std::unique_ptr<ATLab::ITMacBitKeys> keys;
     std::unique_ptr<ATLab::ITMacBits> bits;
 
     std::thread bCOTSenderThread{
         [&]() {
             emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
             ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacKeys>(sender, BitSize);
+            keys = std::make_unique<ATLab::ITMacBitKeys>(sender, BitSize);
         }
     }, bCOTReceiverThread{
         [&]() {
@@ -160,7 +160,7 @@ TEST(Authed_Bit, authed_blocks) {
 
     emp::block tmpProd;
     for (size_t i {0}; i != deltaSize; ++i) {
-        emp::gfmul(deltaArr.at(i), AuthedBlocks.block, &tmpProd);
+        emp::gfmul(deltaArr.at(i), AuthedBlocks.get_block(), &tmpProd);
         const auto expected {ATLab::as_uint128(BlockKeys.get_local_key(i) ^ tmpProd)};
         EXPECT_EQ(expected, ATLab::as_uint128(AuthedBlocks.get_mac(i)));
     }

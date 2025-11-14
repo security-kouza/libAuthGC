@@ -44,7 +44,7 @@ set(SRC
     src/EndemicOT/Endemic_OT_C.c
     src/EndemicOT/EndemicOT.cpp
     src/EndemicOT/OTTools.c
-    include/global_key_sampling.hpp
+    src/authed_bit.cpp
 )
 set(HEADER
     include/socket.hpp

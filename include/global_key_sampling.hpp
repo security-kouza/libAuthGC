@@ -5,15 +5,15 @@
 
 #include <immintrin.h>
 
+#include "authed_bit.hpp"
 #include "PRNG.hpp"
 #include "block_correlated_OT.hpp"
 #include "params.hpp"
 
 namespace ATLab::GlobalKeySampling {
-    using int128 = __uint128_t;
-
+    // PA
     class Garbler {
-        int128 _delta, _alpha_0;
+        emp::block _delta, _alpha_0;
         std::unique_ptr<BlockCorrelatedOT::Sender> _pSid0;
 
         BlockCorrelatedOT::Sender& sid0() const {
@@ -24,11 +24,11 @@ namespace ATLab::GlobalKeySampling {
         }
     public:
         explicit Garbler(emp::NetIO& io) :
-            _delta {PRNG_Kyber::get_PRNG_Kyber()()},
             _alpha_0 {}
         {
-            _delta |= 1;
-            _pSid0 = std::make_unique<BlockCorrelatedOT::Sender>(io, std::vector{as_block(_delta)});
+            __uint128_t delta {PRNG_Kyber::get_PRNG_Kyber()() | 1};
+            _delta = as_block(delta);
+            _pSid0 = std::make_unique<BlockCorrelatedOT::Sender>(io, std::vector{_delta});
 
             // 1
             const auto uLocalKeys {_pSid0->extend(STATISTICAL_SECURITY)};
@@ -36,18 +36,32 @@ namespace ATLab::GlobalKeySampling {
             // 2
             std::bitset<STATISTICAL_SECURITY> lsbsOfULocalKeys;
             for (size_t i = 0; i < STATISTICAL_SECURITY; ++i) {
-                lsbsOfULocalKeys[i] = _mm_extract_epi8(uLocalKeys.at(i), 0) & 1;
+                lsbsOfULocalKeys[i] = get_LSB(uLocalKeys.at(i));
             }
             io.send_data(&lsbsOfULocalKeys, sizeof(lsbsOfULocalKeys));
+
+            // 3
+            auto authedDeltaB {ITMacBlockKeys{io, *_pSid0}};
+            const uint8_t lsbKDeltaB {get_LSB(authedDeltaB.get_local_key(0))};
+            uint8_t lsbMDeltaB;
+            io.send_data(&lsbKDeltaB, sizeof(lsbKDeltaB));
+            io.recv_data(&lsbMDeltaB, sizeof(lsbMDeltaB));
+            if (lsbKDeltaB == lsbMDeltaB) {
+                authedDeltaB.flip_block_lsb();
+            }
+
+            // Skipping 4, 5
+
+            // 6a
         }
     };
 
     class Evaluator {
-        int128 _delta, _beta_0;
+        emp::block _delta, _beta_0;
         BlockCorrelatedOT::Receiver _sid0;
     public:
         explicit Evaluator(emp::NetIO& io) :
-            _delta {PRNG_Kyber::get_PRNG_Kyber()()},
+            _delta {as_block(PRNG_Kyber::get_PRNG_Kyber()())},
             _beta_0 {},
             _sid0 {io, 1}
         {
@@ -57,12 +71,26 @@ namespace ATLab::GlobalKeySampling {
             // 2
             std::bitset<STATISTICAL_SECURITY> expectedLsb, receivedLsbs;
             for (size_t i = 0; i < STATISTICAL_SECURITY; ++i) {
-                expectedLsb[i] = (_mm_extract_epi8(uMacArr.at(i), 0) & 1) ^ uArr.at(i);
+                expectedLsb[i] = get_LSB(uMacArr.at(i)) ^ uArr.at(i);
             }
             io.recv_data(&receivedLsbs, sizeof(receivedLsbs));
             if (receivedLsbs != expectedLsb) {
                 throw std::runtime_error{"Malicious check failed: LSB of ΔA might not be 1."};
             }
+
+            // 3
+            auto authedDeltaB {ITMacBlocks{io, _sid0, _delta}};
+            const uint8_t lsbMDeltaB {get_LSB(authedDeltaB.get_mac(0))};
+            uint8_t lsbKDeltaB;
+            // TODO: parallel send
+            io.recv_data(&lsbKDeltaB, sizeof(lsbKDeltaB));
+            io.send_data(&lsbMDeltaB, sizeof(lsbMDeltaB));
+            if (lsbKDeltaB == lsbMDeltaB) {
+                authedDeltaB.flip_block_lsb();
+                _delta = authedDeltaB.get_block();
+            }
+
+            // Skipping 4, 5
         }
     };
 }

@@ -78,6 +78,18 @@ namespace ATLab {
         return make_block_from_bits_128(bits);
     }
 
+    std::vector<bool> to_bool_vector(const emp::block& block) {
+        const uint64_t low = _mm_extract_epi64(block, 0);
+        const uint64_t high = _mm_extract_epi64(block, 1);
+
+        std::vector<bool> bits(128);
+        for (int i = 0; i != 64; ++i) {
+            bits[i] = (low >> i) & 1;
+            bits[i + 64] = (high >> i) & 1;
+        }
+        return bits;
+    }
+
     // const emp::block& as_block(const __uint128_t& i128) {
     //     return *reinterpret_cast<const emp::block*>(&i128);
     // }

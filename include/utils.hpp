@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef REVELIO_UTILS
 #define REVELIO_UTILS
 
+#include <bitset>
 #include <mutex>
 #include <iostream>
 #include <vector>
@@ -49,14 +50,17 @@ namespace ATLab {
         print_bytes(buf.data(), N);
     }
 
-    // Little Endian.
+    // Little Endian
     emp::block Block(const std::array<bool, 128>&);
 
-    // Little Endian.
+    // Little Endian
     emp::block Block(const std::vector<bool>&);
 
-    // Little Endian.
+    // Little Endian
     emp::block Block(const bool*);
+
+    // Little Endian
+    std::vector<bool> to_bool_vector(const emp::block&);
 
     inline emp::block as_block(const __uint128_t& i128) {
         const auto lo {static_cast<uint64_t>(i128)};
@@ -78,6 +82,11 @@ namespace ATLab {
      * @param coeff Pointer to an array of 128 coefficients. Little-endian required (coeff[i] * X^i).
      */
     emp::block polyval(const emp::block* coeff);
+
+    inline bool get_LSB(const __m128i& x) {
+        // Fast when the __V is already in a XMM register.
+        return _mm_testz_si128(x, _mm_cvtsi32_si128(1)) == 0;
+    }
 }
 
 #endif // REVELIO_UTILS
