@@ -54,6 +54,8 @@ set(HEADER
     include/EndemicOT/EndemicOT.hpp
     include/EndemicOT/OTTools.h
     include/block_correlated_OT.hpp
+    include/global_key_sampling.hpp
+    include/DVZK.hpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})

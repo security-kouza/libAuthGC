@@ -121,10 +121,10 @@ TEST(Authed_Bit, fixed_bits) {
     }
 }
 
-TEST(Authed_Bit, authed_blocks_multi) {
+TEST(Authed_Bit, random_blocks) {
     constexpr size_t deltaSize {3};
-    constexpr size_t blockCount {4};
-    constexpr size_t BitSize {128 * blockCount};
+    constexpr size_t blockSize {40};
+    constexpr unsigned short BLOCK_PORT {static_cast<unsigned short>(PORT + 2)};
 
     std::vector<emp::block> deltaArr(deltaSize);
     auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
@@ -132,51 +132,50 @@ TEST(Authed_Bit, authed_blocks_multi) {
         delta = ATLab::as_block(prng());
     }
 
-    std::unique_ptr<ATLab::ITMacBitKeys> keys;
-    std::unique_ptr<ATLab::ITMacBits> bits;
+    std::unique_ptr<ATLab::ITMacBlockKeys> keys;
+    std::unique_ptr<ATLab::ITMacBlocks> authedBlocks;
 
     std::thread bCOTSenderThread{
         [&]() {
-            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
+            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, BLOCK_PORT, true);
             ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacBitKeys>(sender, BitSize);
+            keys = std::make_unique<ATLab::ITMacBlockKeys>(sender, blockSize);
         }
     }, bCOTReceiverThread{
         [&]() {
-            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
+            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, BLOCK_PORT, true);
             ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
-            bits = std::make_unique<ATLab::ITMacBits>(receiver, BitSize);
+            authedBlocks = std::make_unique<ATLab::ITMacBlocks>(receiver, blockSize);
         }
     };
 
     bCOTSenderThread.join();
     bCOTReceiverThread.join();
 
-    const auto BlockKeys {std::move(*keys).polyval_to_Blocks()};
-    const auto AuthedBlocks {std::move(*bits).polyval_to_Blocks()};
-
-    ASSERT_EQ(BlockKeys.size(), blockCount);
-    ASSERT_EQ(AuthedBlocks.size(), blockCount);
+    ASSERT_EQ(keys->size(), blockSize);
+    ASSERT_EQ(authedBlocks->size(), blockSize);
+    ASSERT_EQ(keys->global_key_size(), deltaSize);
+    ASSERT_EQ(authedBlocks->global_key_size(), deltaSize);
 
     for (size_t i {0}; i != deltaSize; ++i) {
-        ASSERT_EQ(ATLab::as_uint128(deltaArr.at(i)), ATLab::as_uint128(BlockKeys.get_global_key(i)));
+        ASSERT_EQ(ATLab::as_uint128(deltaArr.at(i)), ATLab::as_uint128(keys->get_global_key(i)));
     }
 
     emp::block tmpProd;
     for (size_t deltaIter {0}; deltaIter != deltaSize; ++deltaIter) {
-        for (size_t blockIter {0}; blockIter != blockCount; ++blockIter) {
-            emp::gfmul(deltaArr.at(deltaIter), AuthedBlocks.get_block(blockIter), &tmpProd);
+        for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
+            emp::gfmul(deltaArr.at(deltaIter), authedBlocks->get_block(blockIter), &tmpProd);
             const auto expected {
-                ATLab::as_uint128(BlockKeys.get_local_key(deltaIter, blockIter) ^ tmpProd)
+                ATLab::as_uint128(keys->get_local_key(deltaIter, blockIter) ^ tmpProd)
             };
-            EXPECT_EQ(expected, ATLab::as_uint128(AuthedBlocks.get_mac(deltaIter, blockIter)));
+            EXPECT_EQ(expected, ATLab::as_uint128(authedBlocks->get_mac(deltaIter, blockIter)));
         }
     }
 }
 
-TEST(Authed_Bit, fixed_blocks_multi) {
+TEST(Authed_Bit, fixed_blocks) {
     constexpr size_t deltaSize {3};
-    constexpr size_t blockCount {3};
+    constexpr size_t blockSize {40};
     constexpr unsigned short LOCAL_PORT {static_cast<unsigned short>(PORT + 1)};
 
     std::vector<emp::block> deltaArr(deltaSize);
@@ -185,7 +184,7 @@ TEST(Authed_Bit, fixed_blocks_multi) {
         delta = ATLab::as_block(prng());
     }
 
-    std::vector<emp::block> blocksToFix(blockCount);
+    std::vector<emp::block> blocksToFix(blockSize);
     for (auto& block : blocksToFix) {
         block = ATLab::as_block(prng());
     }
@@ -197,7 +196,7 @@ TEST(Authed_Bit, fixed_blocks_multi) {
         [&]() {
             emp::NetIO io(emp::NetIO::SERVER, ADDRESS, LOCAL_PORT, true);
             ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockCount);
+            keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockSize);
         }
     }, bCOTReceiverThread{
         [&, blocksToFix]() {
@@ -210,12 +209,12 @@ TEST(Authed_Bit, fixed_blocks_multi) {
     bCOTSenderThread.join();
     bCOTReceiverThread.join();
 
-    ASSERT_EQ(keys->size(), blockCount);
-    ASSERT_EQ(authedBlocks->size(), blockCount);
+    ASSERT_EQ(keys->size(), blockSize);
+    ASSERT_EQ(authedBlocks->size(), blockSize);
     ASSERT_EQ(keys->global_key_size(), deltaSize);
     ASSERT_EQ(authedBlocks->global_key_size(), deltaSize);
 
-    for (size_t blockIter {0}; blockIter != blockCount; ++blockIter) {
+    for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
         EXPECT_EQ(
             ATLab::as_uint128(blocksToFix.at(blockIter)),
             ATLab::as_uint128(authedBlocks->get_block(blockIter))
@@ -228,7 +227,7 @@ TEST(Authed_Bit, fixed_blocks_multi) {
 
     emp::block tmpProd;
     for (size_t deltaIter {0}; deltaIter != deltaSize; ++deltaIter) {
-        for (size_t blockIter {0}; blockIter != blockCount; ++blockIter) {
+        for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
             emp::gfmul(deltaArr.at(deltaIter), authedBlocks->get_block(blockIter), &tmpProd);
             const auto expected {
                 ATLab::as_uint128(keys->get_local_key(deltaIter, blockIter) ^ tmpProd)

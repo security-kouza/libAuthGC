@@ -56,7 +56,7 @@ namespace ATLab {
         _globalKeySize {globalKeySize}
     {
         if (_blocks.empty() || !_globalKeySize) {
-            throw std::invalid_argument{"Wrong parameter sizes."};
+            throw std::invalid_argument{"Empty argument"};
         }
         if (_macs.size() != _blocks.size() * _globalKeySize) {
             throw std::invalid_argument{"Wrong parameter sizes."};
@@ -88,6 +88,20 @@ namespace ATLab {
     {}
 
     ITMacBlocks::ITMacBlocks(
+        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const size_t blockSize
+    ):
+        ITMacBlocks {
+            [&bCOTReceiver, blockSize]() {
+                if (!blockSize) {
+                    throw std::invalid_argument{"blockSize cannot be zero."};
+                }
+                return ITMacBits{bCOTReceiver, blockSize * BLOCK_BIT_SIZE}.polyval_to_Blocks();
+            }()
+        }
+    {}
+
+    ITMacBlocks::ITMacBlocks(
         emp::NetIO& io,
         BlockCorrelatedOT::Receiver& bCOTReceiver,
         std::vector<emp::block> blocksToAuth
@@ -111,6 +125,20 @@ namespace ATLab {
                 auto blockMacs {polyval_mac_chunks(fixedBits._macs.data(), totalBits, globalKeySize, blockCount)};
 
                 return ITMacBlocks{std::move(blocks), std::move(blockMacs), globalKeySize};
+            }()
+        }
+    {}
+
+    ITMacBlockKeys::ITMacBlockKeys(
+        BlockCorrelatedOT::Sender& bCOTSender,
+        size_t blockSize
+    ):
+        ITMacBlockKeys {
+            [&bCOTSender, blockSize]() -> ITMacBlockKeys {
+                if (!blockSize) {
+                    throw std::invalid_argument{"blockSize cannot be zero."};
+                }
+                return ITMacBitKeys{bCOTSender, blockSize * BLOCK_BIT_SIZE}.polyval_to_Blocks();
             }()
         }
     {}

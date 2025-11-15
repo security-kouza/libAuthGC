@@ -26,7 +26,14 @@ namespace ATLab {
          * @param bits size must be 128 * blockSize
          * @param macs size must be bits.size() * deltaArrSize
          */
-        ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, const size_t deltaArrSize);
+        ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, size_t deltaArrSize);
+
+        /**
+         * Random ITMacBlock constructor
+         * Protocol interactions involved.
+         * @param blockSize Number of blocks to generate.
+         */
+        ITMacBlocks(BlockCorrelatedOT::Receiver& bCOTReceiver, size_t blockSize);
 
         // `Fix` for blocks
         ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
@@ -79,6 +86,13 @@ namespace ATLab {
                 }
             }
         }
+
+        /**
+         * Random ITMacBlock key constructor
+         * Protocol interactions involved.
+         * @param blockSize Number of blocks to generate.
+         */
+        ITMacBlockKeys(BlockCorrelatedOT::Sender& bCOTSender, size_t blockSize);
 
         // `Fix` for blocks
         ITMacBlockKeys(emp::NetIO&, BlockCorrelatedOT::Sender&, size_t blockSize);
