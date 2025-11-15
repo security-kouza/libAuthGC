@@ -1,6 +1,8 @@
 #ifndef ATLab_AUTHED_BIT_HPP
 #define ATLab_AUTHED_BIT_HPP
 
+#include <array>
+#include <stdexcept>
 #include <vector>
 
 #include <emp-tool/utils/block.h>
@@ -9,86 +11,129 @@
 #include "block_correlated_OT.hpp"
 
 namespace ATLab {
+    constexpr size_t BLOCK_BIT_SIZE {128};
+
     class ITMacBlocks {
-        std::vector<emp::block> _macs;
-        const size_t _size; // global key size
-        emp::block _block;
+        std::vector<emp::block> _macs; // flattened by global key then block index
+        std::vector<emp::block> _blocks;
+        const size_t _globalKeySize; // number of global keys
     public:
 
         /**
          *
-         * @param bits size must be 128
-         * @param macs size must be 128 * deltaArrSize
+         * @param bits size must be 128 * blockSize
+         * @param macs size must be bits.size() * deltaArrSize
          */
         ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, const size_t deltaArrSize):
-            _size(deltaArrSize),
-            _block {Block(bits)}
+            _globalKeySize(deltaArrSize)
         {
-            if (bits.size() != 128 || macs.size() != 128 * deltaArrSize) {
+            const size_t totalBits {bits.size()};
+            if (!totalBits || totalBits % BLOCK_BIT_SIZE != 0) {
+                throw std::invalid_argument{"Wrong parameter sizes."};
+            }
+            if (macs.size() != totalBits * deltaArrSize) {
                 throw std::invalid_argument{"Wrong parameter sizes."};
             }
 
-            _macs.reserve(_size);
-            for (size_t i {0}; i != deltaArrSize; ++i) {
-                _macs.push_back(polyval(macs.data() + 128 * i));
+            const size_t blockSize {totalBits / BLOCK_BIT_SIZE};
+
+            _blocks.reserve(blockSize);
+            std::bitset<BLOCK_BIT_SIZE> bitChunk;
+            for (size_t blockIter{0}; blockIter != blockSize; ++blockIter) {
+                for (size_t bitIter{0}; bitIter != BLOCK_BIT_SIZE; ++bitIter) {
+                    bitChunk[bitIter] = bits.at(blockIter * BLOCK_BIT_SIZE + bitIter);
+                }
+                _blocks.push_back(Block(bitChunk));
+            }
+
+            _macs.reserve(blockSize * _globalKeySize);
+            for (size_t deltaIter {0}; deltaIter != _globalKeySize; ++deltaIter) {
+                const emp::block* macBase {macs.data() + deltaIter * totalBits};
+                for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
+                    _macs.push_back(polyval(macBase + blockIter * BLOCK_BIT_SIZE));
+                }
             }
         }
 
-        // `Fix` for a block
-        ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, const emp::block& blockToAuth);
+        // `Fix` for blocks
+        ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
 
         size_t global_key_size() const {
-            return _size;
+            return _globalKeySize;
         }
 
-        const emp::block& get_block() const {
-            return _block;
+        size_t size() const {
+            return _blocks.size();
         }
 
-        const emp::block& get_mac(const size_t pos) const {
-            return _macs.at(pos);
+        const emp::block& get_block(const size_t blockPos = 0) const {
+            return _blocks.at(blockPos);
+        }
+
+        const emp::block& get_mac(const size_t globalKeyPos, const size_t blockPos = 0) const {
+            return _macs.at(globalKeyPos * size() + blockPos);
         }
 
         // block ^= 1, macs unchanged
-        void flip_block_lsb() {
-            _block = _mm_xor_si128(_block, _mm_set_epi64x(0, 1));
+        void flip_block_lsb(const size_t blockPos = 0) {
+            _blocks.at(blockPos) = _mm_xor_si128(_blocks.at(blockPos), _mm_set_epi64x(0, 1));
         }
     };
 
     class ITMacBlockKeys {
-        std::vector<emp::block> _localKeys;
+        std::vector<emp::block> _localKeys; // flattened by global key then block index
         std::vector<emp::block> _globalKeys;
     public:
         ITMacBlockKeys(const std::vector<emp::block>& localKeys, std::vector<emp::block> globalKeys):
             _globalKeys {std::move(globalKeys)}
         {
-            if (localKeys.size() != 128 * _globalKeys.size()) {
-                throw std::invalid_argument{"Size of localKeys per global key is not 128."};
+            if (_globalKeys.empty()) {
+                throw std::invalid_argument{"Global keys cannot be empty."};
             }
-            _localKeys.reserve(globalKeys.size());
+            if (localKeys.size() % _globalKeys.size() != 0) {
+                throw std::invalid_argument{"Wrong parameter sizes."};
+            }
+            const size_t totalBitsPerGlobalKey {localKeys.size() / _globalKeys.size()};
+            if (!totalBitsPerGlobalKey || totalBitsPerGlobalKey % BLOCK_BIT_SIZE != 0) {
+                throw std::invalid_argument{"Size of localKeys per global key is not a multiple of 128."};
+            }
+            const size_t blockSize {totalBitsPerGlobalKey / BLOCK_BIT_SIZE};
+            _localKeys.reserve(blockSize * _globalKeys.size());
             for (size_t i {0}; i != _globalKeys.size(); ++i) {
-                _localKeys.push_back(polyval(localKeys.data() + i * 128));
+                const emp::block* localBase {localKeys.data() + i * totalBitsPerGlobalKey};
+                for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
+                    _localKeys.push_back(polyval(localBase + blockIter * BLOCK_BIT_SIZE));
+                }
             }
         }
 
-        // `Fix` for a block
-        ITMacBlockKeys(emp::NetIO&, BlockCorrelatedOT::Sender&);
+        // `Fix` for blocks
+        ITMacBlockKeys(emp::NetIO&, BlockCorrelatedOT::Sender&, size_t blockSize);
 
         size_t global_key_size() const {
             return _globalKeys.size();
         }
 
-        const emp::block& get_local_key(const size_t pos) const {
-            return _localKeys.at(pos);
+        size_t size() const {
+            if (_globalKeys.empty()) {
+                return 0;
+            }
+            return _localKeys.size() / _globalKeys.size();
+        }
+
+        const emp::block& get_local_key(const size_t globalKeyPos, const size_t blockPos = 0) const {
+            return _localKeys.at(globalKeyPos * size() + blockPos);
         }
         const emp::block& get_global_key(const size_t pos) const {
             return _globalKeys.at(pos);
         }
 
         // adding authenticated 1
-        void flip_block_lsb() {
+        void flip_block_lsb(const size_t blockPos = 0) {
+            const size_t blockSize {size()};
             for (size_t i {0}; i != global_key_size(); ++i) {
-                _localKeys.at(i) = _mm_xor_si128(_localKeys.at(i), _globalKeys.at(i));
+                _localKeys.at(i * blockSize + blockPos) =
+                    _mm_xor_si128(_localKeys.at(i * blockSize + blockPos), _globalKeys.at(i));
             }
         }
     };
@@ -220,9 +265,11 @@ namespace ATLab {
             }
 
             for (size_t iterGlobalKey {0}; iterGlobalKey < _globalKeys.size(); ++iterGlobalKey) {
+                const emp::block& gk = _globalKeys[iterGlobalKey];
+                const size_t rowBase = iterGlobalKey * bitsSize;
                 for (size_t iterBit {0}; iterBit < bitsSize; ++iterBit) {
-                        _localKeys.at(iterBit + iterGlobalKey * bitsSize) ^=
-                            _globalKeys.at(iterGlobalKey) & masks.at(iterBit);
+                    emp::block& lk = _localKeys[rowBase + iterBit];
+                    lk = _mm_xor_si128(lk, _mm_and_si128(gk, masks[iterBit]));
                 }
             }
 

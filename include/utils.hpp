@@ -60,6 +60,9 @@ namespace ATLab {
     emp::block Block(const bool*);
 
     // Little Endian
+    emp::block Block(const std::bitset<128>&);
+
+    // Little Endian
     std::vector<bool> to_bool_vector(const emp::block&);
 
     inline emp::block as_block(const __uint128_t& i128) {

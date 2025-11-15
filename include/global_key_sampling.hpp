@@ -41,7 +41,7 @@ namespace ATLab::GlobalKeySampling {
             io.send_data(&lsbsOfULocalKeys, sizeof(lsbsOfULocalKeys));
 
             // 3
-            auto authedDeltaB {ITMacBlockKeys{io, *_pSid0}};
+            auto authedDeltaB {ITMacBlockKeys{io, *_pSid0, 1}};
             const uint8_t lsbKDeltaB {get_LSB(authedDeltaB.get_local_key(0))};
             uint8_t lsbMDeltaB;
             io.send_data(&lsbKDeltaB, sizeof(lsbKDeltaB));
@@ -79,7 +79,7 @@ namespace ATLab::GlobalKeySampling {
             }
 
             // 3
-            auto authedDeltaB {ITMacBlocks{io, _sid0, _delta}};
+            auto authedDeltaB {ITMacBlocks{io, _sid0, {_delta}}};
             const uint8_t lsbMDeltaB {get_LSB(authedDeltaB.get_mac(0))};
             uint8_t lsbKDeltaB;
             // TODO: parallel send
