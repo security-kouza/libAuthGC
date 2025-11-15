@@ -24,7 +24,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <mutex>
 #include <iostream>
 #include <vector>
+#include <utility>
 #include <emp-tool/utils/block.h>
+#include <emp-tool/utils/f2k.h>
 
 #include "PRNG.hpp"
 
@@ -79,6 +81,30 @@ namespace ATLab {
 
     // const emp::block& as_block(const __uint128_t&);
     // const __uint128_t& as_uint128(const emp::block&);
+
+    namespace detail {
+        inline emp::block gf_mul_block(const emp::block& lhs, const emp::block& rhs) {
+            emp::block out;
+            emp::gfmul(lhs, rhs, &out);
+            return out;
+        }
+
+        template <size_t... Indices>
+        inline emp::block vector_inner_product_impl(const emp::block* a, const emp::block* b, std::index_sequence<Indices...>) {
+            emp::block accumulator = emp::zero_block;
+            ((accumulator = accumulator ^ gf_mul_block(a[Indices], b[Indices])), ...);
+            return accumulator;
+        }
+    }
+
+    template<size_t N>
+    emp::block vector_inner_product(const emp::block* a, const emp::block* b) {
+        if constexpr (N == 0) {
+            return emp::zero_block;
+        } else {
+            return detail::vector_inner_product_impl(a, b, std::make_index_sequence<N>{});
+        }
+    }
 
     /**
      * Computes the polynomial evaluation using the provided coefficients in a Galois field.

@@ -78,6 +78,7 @@ if (ENABLE_TEST)
         tests/bCOT.test.cpp
         tests/authed_bit.test.cpp
         tests/global_key_sampling.test.cpp
+        tests/vector_inner_production_benchmark.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
