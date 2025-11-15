@@ -7,53 +7,26 @@
 
 #include <emp-tool/utils/block.h>
 
+#include "params.hpp"
 #include "utils.hpp"
 #include "block_correlated_OT.hpp"
 
 namespace ATLab {
-    constexpr size_t BLOCK_BIT_SIZE {128};
-
     class ITMacBlocks {
         std::vector<emp::block> _macs; // flattened by global key then block index
         std::vector<emp::block> _blocks;
         const size_t _globalKeySize; // number of global keys
+
+        ITMacBlocks(std::vector<emp::block>&& blocks, std::vector<emp::block>&& macs, size_t globalKeySize);
     public:
+
 
         /**
          *
          * @param bits size must be 128 * blockSize
          * @param macs size must be bits.size() * deltaArrSize
          */
-        ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, const size_t deltaArrSize):
-            _globalKeySize(deltaArrSize)
-        {
-            const size_t totalBits {bits.size()};
-            if (!totalBits || totalBits % BLOCK_BIT_SIZE != 0) {
-                throw std::invalid_argument{"Wrong parameter sizes."};
-            }
-            if (macs.size() != totalBits * deltaArrSize) {
-                throw std::invalid_argument{"Wrong parameter sizes."};
-            }
-
-            const size_t blockSize {totalBits / BLOCK_BIT_SIZE};
-
-            _blocks.reserve(blockSize);
-            std::bitset<BLOCK_BIT_SIZE> bitChunk;
-            for (size_t blockIter{0}; blockIter != blockSize; ++blockIter) {
-                for (size_t bitIter{0}; bitIter != BLOCK_BIT_SIZE; ++bitIter) {
-                    bitChunk[bitIter] = bits.at(blockIter * BLOCK_BIT_SIZE + bitIter);
-                }
-                _blocks.push_back(Block(bitChunk));
-            }
-
-            _macs.reserve(blockSize * _globalKeySize);
-            for (size_t deltaIter {0}; deltaIter != _globalKeySize; ++deltaIter) {
-                const emp::block* macBase {macs.data() + deltaIter * totalBits};
-                for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
-                    _macs.push_back(polyval(macBase + blockIter * BLOCK_BIT_SIZE));
-                }
-            }
-        }
+        ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, const size_t deltaArrSize);
 
         // `Fix` for blocks
         ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
