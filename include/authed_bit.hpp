@@ -18,8 +18,8 @@ namespace ATLab {
         const size_t _globalKeySize; // number of global keys
 
         ITMacBlocks(std::vector<emp::block>&& blocks, std::vector<emp::block>&& macs, size_t globalKeySize);
-    public:
 
+    public:
 
         /**
          *
@@ -191,7 +191,11 @@ namespace ATLab {
             return _bits.at(pos);
         }
 
-        const emp::block& get_mac(const size_t bitPos, const size_t globalKeyPos) const {
+        bool operator[](const size_t pos) const {
+            return _bits[pos];
+        }
+
+        const emp::block& get_mac(const size_t globalKeyPos, const size_t bitPos) const {
             return _macs.at(bitPos + globalKeyPos * size());
         }
 
@@ -271,7 +275,7 @@ namespace ATLab {
             return _globalKeys.size();
         }
 
-        const emp::block& get_local_key(const size_t bitPos, const size_t globalKeyPos) const {
+        const emp::block& get_local_key(const size_t globalKeyPos, const size_t bitPos) const {
             return _localKeys.at(bitPos + globalKeyPos * size());
         }
 

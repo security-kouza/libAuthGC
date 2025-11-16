@@ -55,11 +55,11 @@ TEST(Authed_Bit, random_bits) {
 
     for (size_t i = 0; i < deltaSize; ++i) {
         for (size_t j = 0; j < BitSize; ++j) {
-            emp::block expected = keys->get_local_key(j, i);
+            emp::block expected = keys->get_local_key(i, j);
             if (bits->at(j)) {
                 expected = expected ^ deltaArr.at(i);
             }
-            EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits->get_mac(j, i)));
+            EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits->get_mac(i, j)));
         }
     }
 }
@@ -112,11 +112,11 @@ TEST(Authed_Bit, fixed_bits) {
 
     for (size_t i = 0; i < deltaSize; ++i) {
         for (size_t j = 0; j < BitSize; ++j) {
-            emp::block expected = keys->get_local_key(j, i);
+            emp::block expected = keys->get_local_key(i, j);
             if (bits->at(j)) {
                 expected = expected ^ deltaArr.at(i);
             }
-            EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits->get_mac(j, i)));
+            EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits->get_mac(i, j)));
         }
     }
 }

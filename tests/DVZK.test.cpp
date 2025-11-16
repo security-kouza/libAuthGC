@@ -78,3 +78,59 @@ TEST(DVZK, default) {
     verifierThread.join();
     proverThread.join();
 }
+
+TEST(DVZK, bits_and_constant) {
+    auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
+
+    const auto pid {fork()};
+
+    if (pid) {
+        std::vector<emp::block> deltaArr(GLOBAL_KEY_SIZE);
+        for (auto& delta : deltaArr) {
+            delta = ATLab::as_block(prng());
+        }
+
+        emp::NetIO io(emp::NetIO::SERVER, ADDRESS, DVZK_PORT, true);
+        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+
+        const ATLab::ITMacBitKeys aKeys {io, sender, BLOCK_SIZE};
+
+        const ATLab::ITMacBlockKeys
+            bKeys {io, sender, 1},
+            cKeys {io, sender, BLOCK_SIZE},
+            randomKeys {io, sender, BLOCK_SIZE};
+
+        EXPECT_NO_THROW(
+            ATLab::DVZK::verify<BLOCK_SIZE>(io, sender, aKeys, bKeys, cKeys)
+        );
+        EXPECT_THROW(
+            ATLab::DVZK::verify<BLOCK_SIZE>(io, sender, aKeys, bKeys, randomKeys),
+            std::runtime_error
+        );
+    } else {
+        const auto aBits {ATLab::random_bool_vector(BLOCK_SIZE)};
+        const auto bBlock {ATLab::as_block(prng())};
+
+        std::vector<emp::block>
+            cBlocks(BLOCK_SIZE, _mm_set_epi64x(0, 0)),
+            randomBlocks(BLOCK_SIZE);
+
+        for (size_t i {0}; i != BLOCK_SIZE; ++i) {
+            randomBlocks.at(i) = ATLab::as_block(prng());
+            if (aBits[i]) {
+                cBlocks[i] = bBlock;
+            }
+        }
+        emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, DVZK_PORT, true);
+        ATLab::BlockCorrelatedOT::Receiver receiver(io, GLOBAL_KEY_SIZE);
+
+        const auto aAuth {ATLab::ITMacBits{io, receiver, aBits}};
+        const ATLab::ITMacBlocks
+            bAuth {io, receiver, {bBlock}},
+            cAuth {io, receiver, cBlocks},
+            randomAuth {io, receiver, randomBlocks};
+
+        ATLab::DVZK::prove<BLOCK_SIZE>(io, receiver, aAuth, bAuth, cAuth);
+        ATLab::DVZK::prove<BLOCK_SIZE>(io, receiver, aAuth, bAuth, randomAuth);
+    }
+}

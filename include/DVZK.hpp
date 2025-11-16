@@ -51,6 +51,62 @@ namespace ATLab::DVZK {
     }
 
     /**
+     * Prove x[i] * y == z[i]
+     * @tparam blockSize the size of z and x
+     * @param x size must be blockSize, with only one global key
+     * @param y size must be 1
+     * @param z size must be blockSize, with only one global key
+     */
+    template<size_t blockSize>
+    void prove(
+        emp::NetIO& io,
+        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const ITMacBits& x,
+        const ITMacBlocks& y,
+        const ITMacBlocks& z
+    ) {
+#ifdef DEBUG
+        if (x.size() != z.size() || y.size() != 1) {
+            throw std::invalid_argument{"Wrong parameter size."};
+        }
+#endif // DEBUG
+        const emp::block& yValue {y.get_block(0)};
+        const emp::block& yMac {y.get_mac(0, 0)};
+
+        const auto authedBlock {ITMacBlocks{bCOTReceiver, 1}};
+
+        emp::block challengeSeed;
+        io.recv_data(&challengeSeed, sizeof(challengeSeed));
+
+        auto chalGen {emp::PRG{&challengeSeed}};
+        std::array<emp::block, blockSize> challenges;
+        chalGen.random_block(challenges.data(), blockSize);
+
+        // A0
+        std::array<emp::block, blockSize> macProd {};
+        for (size_t i {0}; i != blockSize; ++i) {
+            emp::gfmul(x.get_mac(0, i), yMac, &macProd[i]);
+        }
+        emp::block A0 {vector_inner_product<blockSize>(challenges.data(), macProd.data())};
+        A0 = _mm_xor_si128(A0, authedBlock.get_mac(0, 0));
+
+        // A1
+        std::array<emp::block, blockSize> tmp {};
+        for (size_t i {0}; i != blockSize; ++i) {
+            const emp::block& prodXMacOfY {x[i] ? yMac : _mm_set_epi64x(0, 0)};
+            emp::block prodYMacOfX;
+            emp::gfmul(yValue, x.get_mac(0, i), &prodYMacOfX);
+            tmp[i] = _mm_xor_si128(z.get_mac(0, i), prodXMacOfY);
+            tmp[i] = _mm_xor_si128(tmp[i], prodYMacOfX);
+        }
+        emp::block A1 {vector_inner_product<blockSize>(challenges.data(), tmp.data())};
+        A1 = _mm_xor_si128(A1, authedBlock.get_block(0));
+
+        io.send_data(&A0, sizeof(A0));
+        io.send_data(&A1, sizeof(A1));
+    }
+
+    /**
      * @throw std::runtime_error if failed.
      */
     template <size_t blockSize>
@@ -84,6 +140,64 @@ namespace ATLab::DVZK {
         for (size_t i {0}; i != blockSize; ++i) {
             emp::block prodTwoKeys, prodZWithDelta;
             emp::gfmul(x.get_local_key(0, i), y.get_local_key(0, i), &prodTwoKeys);
+            emp::gfmul(z.get_local_key(0, i), delta, &prodZWithDelta);
+            tmp[i] = _mm_xor_si128(prodTwoKeys, prodZWithDelta);
+        }
+
+        auto B {vector_inner_product<blockSize>(challenges.data(), tmp.data())};
+        B = _mm_xor_si128(B, authedBlockKey.get_local_key(0, 0));
+
+        emp::block A0, A1;
+        io.recv_data(&A0, sizeof(A0));
+        io.recv_data(&A1, sizeof(A1));
+
+        B = _mm_xor_si128(B, A0);
+        emp::block expected;
+        emp::gfmul(A1, delta, &expected);
+        if (emp::cmpBlock(&B, &expected, 1) == false) {
+            throw std::runtime_error{"Malicious behavior detected: DVZK verification failed."};
+        }
+    }
+
+    /**
+     * verify x[i] * y = z[i]
+     * @param x size must be blockSize
+     * @param y size must be 1, with only one global key
+     * @param z size must be blockSize, with only one global key
+     * @throw std::runtime_error if failed.
+     */
+    template <size_t blockSize>
+    void verify(
+        emp::NetIO& io,
+        BlockCorrelatedOT::Sender& bCOTSender,
+        const ITMacBitKeys& x,
+        const ITMacBlockKeys& y,
+        const ITMacBlockKeys& z
+    ) {
+        const emp::block delta  {x.get_global_key(0)};
+        const auto& yKey {y.get_local_key(0, 0)};
+#ifdef DEBUG
+        if (as_uint128(delta) != as_uint128(y.get_global_key(0)) ||
+            as_uint128(delta) != as_uint128(z.get_global_key(0))
+        ) {
+            throw std::invalid_argument{"x, y and z do not share the same global key."};
+        }
+#endif // DEBUG
+
+        const auto authedBlockKey {ITMacBlockKeys{bCOTSender, 1}};
+
+        const auto challengeSeed {ATLab::as_block(PRNG_Kyber::get_PRNG_Kyber()())};
+        io.send_data(&challengeSeed, sizeof(challengeSeed));
+
+        auto chalGen {emp::PRG{&challengeSeed}};
+
+        std::array<emp::block, blockSize> challenges;
+        chalGen.random_block(challenges.data(), blockSize);
+
+        std::array<emp::block, blockSize> tmp {};
+        for (size_t i {0}; i != blockSize; ++i) {
+            emp::block prodTwoKeys, prodZWithDelta;
+            emp::gfmul(x.get_local_key(0, i), yKey, &prodTwoKeys);
             emp::gfmul(z.get_local_key(0, i), delta, &prodZWithDelta);
             tmp[i] = _mm_xor_si128(prodTwoKeys, prodZWithDelta);
         }
