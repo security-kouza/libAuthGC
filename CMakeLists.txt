@@ -56,6 +56,7 @@ set(HEADER
     include/block_correlated_OT.hpp
     include/global_key_sampling.hpp
     include/DVZK.hpp
+    include/circuit_parser.hpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})
@@ -82,6 +83,7 @@ if (ENABLE_TEST)
         tests/DVZK.test.cpp
         tests/global_key_sampling.test.cpp
         tests/vector_inner_product_benchmark.test.cpp
+        tests/circuit.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
