@@ -5,9 +5,12 @@
 
 #include <immintrin.h>
 
+#include <emp-tool/utils/hash.h>
+
 #include "authed_bit.hpp"
 #include "PRNG.hpp"
 #include "block_correlated_OT.hpp"
+#include "DVZK.hpp"
 #include "params.hpp"
 
 namespace ATLab::GlobalKeySampling {
@@ -23,9 +26,7 @@ namespace ATLab::GlobalKeySampling {
             return *_pSid0;
         }
     public:
-        explicit Garbler(emp::NetIO& io) :
-            _alpha_0 {}
-        {
+        explicit Garbler(emp::NetIO& io) {
             __uint128_t delta {PRNG_Kyber::get_PRNG_Kyber()() | 1};
             _delta = as_block(delta);
             _pSid0 = std::make_unique<BlockCorrelatedOT::Sender>(io, std::vector{_delta});
@@ -36,23 +37,85 @@ namespace ATLab::GlobalKeySampling {
             // 2
             std::bitset<STATISTICAL_SECURITY> lsbsOfULocalKeys;
             for (size_t i = 0; i < STATISTICAL_SECURITY; ++i) {
-                lsbsOfULocalKeys[i] = get_LSB(uLocalKeys.at(i));
+                lsbsOfULocalKeys[i] = get_LSB(uLocalKeys[i]);
             }
             io.send_data(&lsbsOfULocalKeys, sizeof(lsbsOfULocalKeys));
 
             // 3
-            auto authedDeltaB {ITMacBlockKeys{io, *_pSid0, 1}};
-            const uint8_t lsbKDeltaB {get_LSB(authedDeltaB.get_local_key(0))};
+            auto deltaBKey {ITMacBlockKeys{io, *_pSid0, 1}};
+            const uint8_t lsbKDeltaB {get_LSB(deltaBKey.get_local_key(0))};
             uint8_t lsbMDeltaB;
             io.send_data(&lsbKDeltaB, sizeof(lsbKDeltaB));
             io.recv_data(&lsbMDeltaB, sizeof(lsbMDeltaB));
             if (lsbKDeltaB == lsbMDeltaB) {
-                authedDeltaB.flip_block_lsb();
+                deltaBKey.flip_block_lsb();
             }
 
+            // extra step
+            _alpha_0 = deltaBKey.get_local_key(0, 0);
+
             // Skipping 4, 5
+            BlockCorrelatedOT::Receiver cotDeltaB {io, 1}; // sid0'
 
             // 6a
+            const auto xKeys {ITMacBitKeys{*_pSid0, STATISTICAL_SECURITY}};
+            const auto xDeltaBKeys {ITMacBlockKeys{io, *_pSid0, STATISTICAL_SECURITY}};
+            DVZK::verify<STATISTICAL_SECURITY>(io, *_pSid0, xKeys, deltaBKey, xDeltaBKeys);
+
+            // b
+            std::bitset<STATISTICAL_SECURITY> lsbsOfXDeltaBKeys;
+            for (size_t i {0}; i != STATISTICAL_SECURITY; ++i) {
+                lsbsOfXDeltaBKeys[i] = get_LSB(xDeltaBKeys.get_local_key(0, i));
+            }
+            io.send_data(&lsbsOfXDeltaBKeys, sizeof(lsbsOfXDeltaBKeys));
+
+            // c
+            ITMacBlocks authedDeltaA {io, cotDeltaB, {_delta}};
+
+            // d
+            const ITMacBits authedY {cotDeltaB, STATISTICAL_SECURITY};
+
+            std::vector<emp::block> yDeltaA;
+            yDeltaA.reserve(STATISTICAL_SECURITY);
+            for (size_t i {0}; i != STATISTICAL_SECURITY; ++i) {
+                yDeltaA.push_back(authedY[i] ? _delta : _mm_set_epi64x(0, 0));
+            }
+            const ITMacBlocks authedYDeltaA {io, cotDeltaB, std::move(yDeltaA)};
+
+            DVZK::prove<STATISTICAL_SECURITY>(io, cotDeltaB, authedY, authedDeltaA, authedYDeltaA);
+
+            // e
+            std::bitset<STATISTICAL_SECURITY> lsbsOfYDeltaAKeys, expectedLsbsOfYDeltaAKeys;
+            for (size_t i {0}; i != STATISTICAL_SECURITY; ++i) {
+                expectedLsbsOfYDeltaAKeys[i] = get_LSB(authedYDeltaA.get_mac(0, i)) ^ authedY[i];
+            }
+            io.recv_data(&lsbsOfYDeltaAKeys, sizeof(lsbsOfYDeltaAKeys));
+            if (lsbsOfYDeltaAKeys != expectedLsbsOfYDeltaAKeys) {
+                throw std::runtime_error{"Garbler: lsb(ΔA * ΔB) is not 1."};
+            }
+
+            // f, g
+            const emp::block toHash {_mm_xor_si128(deltaBKey.get_local_key(0, 0), authedDeltaA.get_mac(0, 0))};
+            std::array<uint8_t, DIGEST_SIZE> hashRes {};
+            emp::Hash::hash_once(hashRes.data(), &toHash, sizeof(toHash));
+            std::array<uint8_t, HALF_DIGEST_SIZE> lowHash {};
+            io.send_data(hashRes.data(), HALF_DIGEST_SIZE);
+            io.recv_data(lowHash.data(), HALF_DIGEST_SIZE);
+
+            const auto expectedLow {
+                *reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data() + HALF_DIGEST_SIZE)
+            };
+            if (expectedLow != lowHash) {
+                throw std::runtime_error{"ΔB not consistent"};
+            }
+        }
+
+        const emp::block& get_delta() const {
+            return _delta;
+        }
+
+        const emp::block& get_alpha_0() const {
+            return _alpha_0;
         }
     };
 
@@ -62,7 +125,6 @@ namespace ATLab::GlobalKeySampling {
     public:
         explicit Evaluator(emp::NetIO& io) :
             _delta {as_block(PRNG_Kyber::get_PRNG_Kyber()())},
-            _beta_0 {},
             _sid0 {io, 1}
         {
             // 1
@@ -71,11 +133,11 @@ namespace ATLab::GlobalKeySampling {
             // 2
             std::bitset<STATISTICAL_SECURITY> expectedLsb, receivedLsbs;
             for (size_t i = 0; i < STATISTICAL_SECURITY; ++i) {
-                expectedLsb[i] = get_LSB(uMacArr.at(i)) ^ uArr.at(i);
+                expectedLsb[i] = get_LSB(uMacArr[i]) ^ uArr[i];
             }
             io.recv_data(&receivedLsbs, sizeof(receivedLsbs));
             if (receivedLsbs != expectedLsb) {
-                throw std::runtime_error{"Malicious check failed: LSB of ΔA might not be 1."};
+                throw std::runtime_error{"Malicious check failed: LSB of ΔA is not 1."};
             }
 
             // 3
@@ -90,7 +152,69 @@ namespace ATLab::GlobalKeySampling {
                 _delta = authedDeltaB.get_block();
             }
 
+            // extra step
+            _beta_0 = authedDeltaB.get_mac(0, 0);
+
             // Skipping 4, 5
+            BlockCorrelatedOT::Sender cotDeltaB {io, {_delta}}; // sid0'
+
+            // 6a
+            const auto authedX {ITMacBits{_sid0, STATISTICAL_SECURITY}};
+
+            std::vector<emp::block> xDeltaB;
+            xDeltaB.reserve(STATISTICAL_SECURITY);
+            for (size_t i {0}; i != STATISTICAL_SECURITY; ++i) {
+                xDeltaB.push_back(authedX[i] ? _delta : _mm_set_epi64x(0, 0));
+            }
+            const auto authedXDeltaB {ITMacBlocks{io, _sid0, std::move(xDeltaB)}};
+
+            DVZK::prove<STATISTICAL_SECURITY>(io, _sid0, authedX, authedDeltaB, authedXDeltaB);
+
+            // b
+            std::bitset<STATISTICAL_SECURITY> lsbsofXDeltaBKeys, expectedLsbsOfXDeltaBKeys;
+            for (size_t i {0}; i != STATISTICAL_SECURITY; ++i) {
+                expectedLsbsOfXDeltaBKeys[i] = get_LSB(authedXDeltaB.get_mac(0, i)) ^ authedX[i];
+            }
+            io.recv_data(&lsbsofXDeltaBKeys, sizeof(lsbsofXDeltaBKeys));
+            if (lsbsofXDeltaBKeys != expectedLsbsOfXDeltaBKeys) {
+                throw std::runtime_error{"Evaluator: lsb(ΔA * ΔB) is not 1."};
+            }
+
+            //c
+            ITMacBlockKeys deltaAKey {io, cotDeltaB, 1};
+
+            // d
+            const ITMacBitKeys yKeys {cotDeltaB, STATISTICAL_SECURITY};
+            const ITMacBlockKeys yDeltaAKeys {io, cotDeltaB, STATISTICAL_SECURITY};
+            DVZK::verify<STATISTICAL_SECURITY>(io, cotDeltaB, yKeys, deltaAKey, yDeltaAKeys);
+
+            // e
+            std::bitset<STATISTICAL_SECURITY> lsbsOfYDeltaAKeys;
+            for (size_t i {0}; i != STATISTICAL_SECURITY; ++i) {
+                lsbsOfYDeltaAKeys[i] = get_LSB(yDeltaAKeys.get_local_key(0, i));
+            }
+            io.send_data(&lsbsOfYDeltaAKeys, sizeof(lsbsOfYDeltaAKeys));
+
+            // f, g
+            const emp::block toHash {_mm_xor_si128(deltaAKey.get_local_key(0, 0), authedDeltaB.get_mac(0, 0))};
+            std::array<uint8_t, DIGEST_SIZE> hashRes {};
+            emp::Hash::hash_once(hashRes.data(), &toHash, sizeof(toHash));
+            std::array<uint8_t, HALF_DIGEST_SIZE> highHash {};
+            io.recv_data(highHash.data(), HALF_DIGEST_SIZE);
+            io.send_data(hashRes.data() + HALF_DIGEST_SIZE, HALF_DIGEST_SIZE);
+
+            const auto expectedHigh {*reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data())};
+            if (expectedHigh != highHash) {
+                throw std::runtime_error{"ΔA not consistent"};
+            }
+        }
+
+        const emp::block& get_delta() const {
+            return _delta;
+        }
+
+        const emp::block& get_beta_0() const {
+            return _beta_0;
         }
     };
 }
