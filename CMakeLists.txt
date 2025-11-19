@@ -45,6 +45,7 @@ set(SRC
     src/EndemicOT/EndemicOT.cpp
     src/EndemicOT/OTTools.c
     src/authed_bit.cpp
+    src/matrix.cpp
 )
 set(HEADER
     include/socket.hpp
@@ -57,6 +58,7 @@ set(HEADER
     include/global_key_sampling.hpp
     include/DVZK.hpp
     include/circuit_parser.hpp
+    include/ATLab/matrix.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})
