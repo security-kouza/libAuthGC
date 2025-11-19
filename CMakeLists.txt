@@ -45,6 +45,7 @@ set(SRC
     src/EndemicOT/EndemicOT.cpp
     src/EndemicOT/OTTools.c
     src/authed_bit.cpp
+    src/preprocess.cpp
     src/matrix.cpp
 )
 set(HEADER
@@ -58,6 +59,7 @@ set(HEADER
     include/global_key_sampling.hpp
     include/DVZK.hpp
     include/circuit_parser.hpp
+    include/ATLab/preprocess.hpp
     include/ATLab/matrix.h
 )
 
@@ -86,6 +88,7 @@ if (ENABLE_TEST)
         tests/global_key_sampling.test.cpp
         tests/vector_inner_product_benchmark.test.cpp
         tests/circuit.test.cpp
+        tests/preprocessor.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})
