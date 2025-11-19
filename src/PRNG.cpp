@@ -20,13 +20,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "PRNG.hpp"
 
 #include <cassert>
+#include <fstream>
 #include <random>
+
+#include "ATLab/matrix.hpp"
 
 extern "C" {
 #include <rng.h>
 }
 
 namespace ATLab {
+    emp::PRG THE_GLOBAL_PRNG;
+
     PRNG_Kyber& PRNG_Kyber::get_PRNG_Kyber() {
         static PRNG_Kyber KyberInstance; // state stored in rng.c
         static bool firstInvocation {true};
@@ -64,38 +69,12 @@ namespace ATLab {
         return *reinterpret_cast<result_type*>(buf.data());
     }
 
-    Bitset random_bool_vector(const size_t len) {
-        constexpr size_t BLOCK_SIZE {128};
-
-        Bitset res(len);
-
-        auto copy_bits_reverse {[&res](
-            const size_t offset,
-            __uint128_t block,
-            const size_t copyLength
-        ) {
-#ifdef DEBUG
-            assert(copyLength <= BLOCK_SIZE);
-#endif // DEBUG
-            for (size_t j {0}; j != copyLength; ++j) {
-                res[offset + j] = block & 1;
-                block >>= 1;
-            }
-        }};
-
-        auto PRNG {PRNG_Kyber::get_PRNG_Kyber()};
-        size_t bitOffset {0};
-
-        for (size_t i {0}; i != len / BLOCK_SIZE; ++i) {
-            const auto randBlock {PRNG()};
-            copy_bits_reverse(bitOffset, randBlock, BLOCK_SIZE);
-            bitOffset += BLOCK_SIZE;
-        }
-        if (const size_t remainingBitsCnt {len % BLOCK_SIZE}) {
-            const auto randBlock{PRNG()};
-            copy_bits_reverse(bitOffset, randBlock, remainingBitsCnt);
-        }
-
+    Bitset random_dynamic_bitset(const size_t bitSize) {
+        const size_t blockSize {calc_bitset_blockSize(bitSize)};
+        std::vector<BitsetBlock> rawData(blockSize);
+        THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
+        Bitset res {rawData.cbegin(), rawData.cend()};
+        res.resize(bitSize);
         return res;
     }
 }

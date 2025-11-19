@@ -9,7 +9,7 @@
 
 #include "params.hpp"
 #include "block_correlated_OT.hpp"
-#include "ATLab/matrix.h"
+#include "ATLab/matrix.hpp"
 
 namespace ATLab {
     class ITMacBlocks {

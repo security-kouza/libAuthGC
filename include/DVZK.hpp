@@ -128,7 +128,7 @@ namespace ATLab::DVZK {
 
         const auto authedBlockKey {ITMacBlockKeys{bCOTSender, 1}};
 
-        const auto challengeSeed {ATLab::as_block(PRNG_Kyber::get_PRNG_Kyber()())};
+        const emp::block challengeSeed {_mm_set_epi64x(THE_GLOBAL_PRNG(), THE_GLOBAL_PRNG())};
         io.send_data(&challengeSeed, sizeof(challengeSeed));
 
         auto chalGen {emp::PRG{&challengeSeed}};
@@ -186,7 +186,7 @@ namespace ATLab::DVZK {
 
         const auto authedBlockKey {ITMacBlockKeys{bCOTSender, 1}};
 
-        const auto challengeSeed {ATLab::as_block(PRNG_Kyber::get_PRNG_Kyber()())};
+        const emp::block challengeSeed {_mm_set_epi64x(THE_GLOBAL_PRNG(), THE_GLOBAL_PRNG())};
         io.send_data(&challengeSeed, sizeof(challengeSeed));
 
         auto chalGen {emp::PRG{&challengeSeed}};

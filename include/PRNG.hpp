@@ -29,10 +29,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <array>
 #include <limits>
 
+#include <emp-tool/utils/prg.h>
+
 #include "utils.hpp"
 
 namespace ATLab {
 
+    extern emp::PRG THE_GLOBAL_PRNG;
+
+    // Deprecated. The `randombytes` used by Kyber is very slow
     // Singleton, since Kyber/rng.c uses a global variable to store the inner state
     class PRNG_Kyber {
     public:
@@ -60,6 +65,7 @@ namespace ATLab {
         result_type operator()();
     };
 
+    // Deprecated
     // generate random array using Kyber's PNG
     template <size_t N>
     std::array<bool, N> random_bool_array() {
@@ -83,8 +89,7 @@ namespace ATLab {
         return res;
     }
 
-    // emp compatible
-    Bitset random_bool_vector(size_t length);
+    Bitset random_dynamic_bitset(size_t bitSize);
 
 
 }

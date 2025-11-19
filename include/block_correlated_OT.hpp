@@ -38,7 +38,7 @@ namespace ATLab::BlockCorrelatedOT {
         std::vector<emp::block> extend(const size_t len) {
             const size_t otSize {len * _deltaArr.size()};
             std::vector<emp::block> k1Vec(otSize), k2Vec(otSize);
-            auto prg = PRNG_Kyber::get_PRNG_Kyber();
+            auto prg = THE_GLOBAL_PRNG;
             for (auto& k1 : k1Vec) {
                 k1 = as_block(prg());
             }
@@ -74,7 +74,7 @@ namespace ATLab::BlockCorrelatedOT {
 
         std::tuple<Bitset, std::vector<emp::block>> extend(const size_t len) {
             const size_t otSize{len * deltaArrSize};
-            Bitset choices{random_bool_vector(len)};
+            Bitset choices{random_dynamic_bitset(len)};
             std::vector<emp::block> macArr(otSize);
 
             // Use regular bool array instead of vector<bool>

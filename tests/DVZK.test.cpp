@@ -110,7 +110,7 @@ TEST(DVZK, bits_and_constant) {
         const auto cpid = wait(NULL);
         EXPECT_EQ(cpid, pid);
     } else {
-        const auto aBits {ATLab::random_bool_vector(BLOCK_SIZE)};
+        const auto aBits {ATLab::random_dynamic_bitset(BLOCK_SIZE)};
         const auto bBlock {ATLab::as_block(prng())};
 
         std::vector<emp::block>

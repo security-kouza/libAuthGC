@@ -74,7 +74,7 @@ TEST(Authed_Bit, fixed_bits) {
         delta = ATLab::as_block(prng());
     }
 
-    auto bitsToFix {ATLab::random_bool_vector(BitSize)};
+    auto bitsToFix {ATLab::random_dynamic_bitset(BitSize)};
 
 
     std::unique_ptr<ATLab::ITMacBitKeys> keys;
