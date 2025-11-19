@@ -64,13 +64,13 @@ namespace ATLab {
         return *reinterpret_cast<result_type*>(buf.data());
     }
 
-    std::vector<bool> random_bool_vector(const size_t len) {
+    Bitset random_bool_vector(const size_t len) {
         constexpr size_t BLOCK_SIZE {128};
 
-        std::vector<bool> res(len);
+        Bitset res(len);
 
-        auto copy_bits_reverse {[](
-            std::vector<bool>::iterator it,
+        auto copy_bits_reverse {[&res](
+            const size_t offset,
             __uint128_t block,
             const size_t copyLength
         ) {
@@ -78,24 +78,22 @@ namespace ATLab {
             assert(copyLength <= BLOCK_SIZE);
 #endif // DEBUG
             for (size_t j {0}; j != copyLength; ++j) {
-                *it = block & 1;
-                ++it;
+                res[offset + j] = block & 1;
                 block >>= 1;
             }
         }};
 
-        auto itBit {res.begin()};
         auto PRNG {PRNG_Kyber::get_PRNG_Kyber()};
+        size_t bitOffset {0};
 
         for (size_t i {0}; i != len / BLOCK_SIZE; ++i) {
             const auto randBlock {PRNG()};
-            copy_bits_reverse(itBit, randBlock, BLOCK_SIZE);
-            itBit += BLOCK_SIZE;
+            copy_bits_reverse(bitOffset, randBlock, BLOCK_SIZE);
+            bitOffset += BLOCK_SIZE;
         }
         if (const size_t remainingBitsCnt {len % BLOCK_SIZE}) {
             const auto randBlock{PRNG()};
-            copy_bits_reverse(itBit, randBlock, remainingBitsCnt);
-            // itBit not used anymore, so no need to move itBit
+            copy_bits_reverse(bitOffset, randBlock, remainingBitsCnt);
         }
 
         return res;

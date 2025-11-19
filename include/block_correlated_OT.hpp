@@ -6,6 +6,8 @@
 #include <emp-ot-original/iknp.h>
 
 #include "EndemicOT/EndemicOT.hpp"
+#include "utils.hpp"
+#include "PRNG.hpp"
 
 // using IKNP
 namespace ATLab::BlockCorrelatedOT {
@@ -70,9 +72,9 @@ namespace ATLab::BlockCorrelatedOT {
             _ot.setup_recv();
         }
 
-        std::tuple<std::vector<bool>, std::vector<emp::block>> extend(const size_t len) {
+        std::tuple<Bitset, std::vector<emp::block>> extend(const size_t len) {
             const size_t otSize{len * deltaArrSize};
-            std::vector<bool> choices{random_bool_vector(len)};
+            Bitset choices{random_bool_vector(len)};
             std::vector<emp::block> macArr(otSize);
 
             // Use regular bool array instead of vector<bool>

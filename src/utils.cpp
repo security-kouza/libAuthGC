@@ -1,5 +1,4 @@
 #include "utils.hpp"
-#include "PRNG.hpp"
 
 #include <array>
 #include <iostream>
@@ -23,11 +22,11 @@ namespace ATLab {
     std::mutex PrintMutex;
 
     void print_log (const std::string& msg) {
-    #ifdef DEBUG
+#ifdef DEBUG
         PrintMutex.lock();
         std::clog << "[DEBUG] " << msg << '\n';
         PrintMutex.unlock();
-    #endif // DEBUG
+#endif // DEBUG
     }
 
     /**
@@ -67,7 +66,7 @@ namespace ATLab {
         return make_block_from_bits_128(bits);
     }
 
-    emp::block Block(const std::vector<bool>& bits) {
+    emp::block Block(const Bitset& bits) {
         if (bits.size() != 128) {
             throw std::invalid_argument("vector must contain exactly 128 bits");
         }
@@ -82,25 +81,17 @@ namespace ATLab {
         return make_block_from_bits_128(bits);
     }
 
-    std::vector<bool> to_bool_vector(const emp::block& block) {
+    Bitset to_bool_vector(const emp::block& block) {
         const uint64_t low = _mm_extract_epi64(block, 0);
         const uint64_t high = _mm_extract_epi64(block, 1);
 
-        std::vector<bool> bits(128);
+        Bitset bits(128);
         for (int i = 0; i != 64; ++i) {
             bits[i] = (low >> i) & 1;
             bits[i + 64] = (high >> i) & 1;
         }
         return bits;
     }
-
-    // const emp::block& as_block(const __uint128_t& i128) {
-    //     return *reinterpret_cast<const emp::block*>(&i128);
-    // }
-
-    // const __uint128_t& as_uint128(const emp::block& block) {
-    //     return *reinterpret_cast<const __uint128_t*>(&block);
-    // }
 
     emp::block polyval(const emp::block* coeff) {
         emp::block res;

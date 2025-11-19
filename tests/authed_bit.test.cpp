@@ -74,7 +74,7 @@ TEST(Authed_Bit, fixed_bits) {
         delta = ATLab::as_block(prng());
     }
 
-    std::vector<bool> bitsToFix {ATLab::random_bool_vector(BitSize)};
+    auto bitsToFix {ATLab::random_bool_vector(BitSize)};
 
 
     std::unique_ptr<ATLab::ITMacBitKeys> keys;
@@ -103,7 +103,7 @@ TEST(Authed_Bit, fixed_bits) {
     ASSERT_EQ(bits->global_key_size(), deltaSize);
 
     for (size_t i {0}; i != BitSize; ++i) {
-        ASSERT_EQ(bits->at(i), bitsToFix.at(i));
+        ASSERT_EQ(bits->at(i), bitsToFix.test(i));
     }
 
     for (size_t i {0}; i != deltaSize; ++i) {

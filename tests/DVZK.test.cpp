@@ -107,6 +107,8 @@ TEST(DVZK, bits_and_constant) {
             ATLab::DVZK::verify<BLOCK_SIZE>(io, sender, aKeys, bKeys, randomKeys),
             std::runtime_error
         );
+        const auto cpid = wait(NULL);
+        EXPECT_EQ(cpid, pid);
     } else {
         const auto aBits {ATLab::random_bool_vector(BLOCK_SIZE)};
         const auto bBlock {ATLab::as_block(prng())};
@@ -132,5 +134,6 @@ TEST(DVZK, bits_and_constant) {
 
         ATLab::DVZK::prove<BLOCK_SIZE>(io, receiver, aAuth, bAuth, cAuth);
         ATLab::DVZK::prove<BLOCK_SIZE>(io, receiver, aAuth, bAuth, randomAuth);
+        exit(0);
     }
 }

@@ -22,7 +22,7 @@ TEST(BCOT, DEFAULT) {
     }
 
     std::vector<emp::block> localKeys;
-    std::vector<bool> choices;
+    ATLab::Bitset choices;
     std::vector<emp::block> macArr;
 
     std::thread bCOTSenderThread{
@@ -51,7 +51,7 @@ TEST(BCOT, DEFAULT) {
     for (size_t i = 0; i < deltaSize; ++i) {
         for (size_t j = 0; j < OT_SIZE; ++j) {
             emp::block expected = localKeys[i * OT_SIZE + j];
-            if (choices[j]) {
+            if (choices.test(j)) {
                 expected = expected ^ deltaArr[i];
             }
             ASSERT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(macArr[i * OT_SIZE + j]));

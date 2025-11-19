@@ -29,6 +29,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <array>
 #include <limits>
 
+#include "utils.hpp"
+
 namespace ATLab {
 
     // Singleton, since Kyber/rng.c uses a global variable to store the inner state
@@ -82,7 +84,7 @@ namespace ATLab {
     }
 
     // emp compatible
-    std::vector<bool> random_bool_vector(size_t length);
+    Bitset random_bool_vector(size_t length);
 
 
 }

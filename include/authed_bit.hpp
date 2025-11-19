@@ -26,7 +26,7 @@ namespace ATLab {
          * @param bits size must be 128 * blockSize
          * @param macs size must be bits.size() * deltaArrSize
          */
-        ITMacBlocks(const std::vector<bool>& bits, std::vector<emp::block> macs, size_t deltaArrSize);
+        ITMacBlocks(const Bitset& bits, std::vector<emp::block> macs, size_t deltaArrSize);
 
         /**
          * Random ITMacBlock constructor
@@ -128,7 +128,7 @@ namespace ATLab {
     class ITMacBits {
         friend class ITMacBlocks;
 
-        std::vector<bool> _bits;
+        Bitset _bits;
         std::vector<emp::block> _macs; // _macs.size() == _bits.size() * deltaArrSize
     public:
         ITMacBits() = delete;
@@ -138,7 +138,7 @@ namespace ATLab {
          * @param bits Cannot be empty.
          * @param macs Must be a multiple of bits.size()
          */
-        ITMacBits(std::vector<bool>&& bits, std::vector<emp::block>&& macs):
+        ITMacBits(Bitset&& bits, std::vector<emp::block>&& macs):
             _bits {std::move(bits)},
             _macs {std::move(macs)}
         {
@@ -163,7 +163,7 @@ namespace ATLab {
          * Fixed ITMacBit constructor, the `Fix` procedure defined in CYYW23.
          * Will invoke the random constructor first, and send to
          */
-        ITMacBits(emp::NetIO& io, BlockCorrelatedOT::Receiver& bCOTReceiver, std::vector<bool> bitsToFix):
+        ITMacBits(emp::NetIO& io, BlockCorrelatedOT::Receiver& bCOTReceiver, Bitset bitsToFix):
             ITMacBits{bCOTReceiver, bitsToFix.size()}
         {
 
@@ -171,7 +171,7 @@ namespace ATLab {
             // TODO: Compact the bool array to save communication
             auto* diffArr = new bool[_bits.size()];
             for (size_t i {0}; i < _bits.size(); ++i) {
-                diffArr[i] = _bits.at(i) ^ bitsToFix.at(i);
+                diffArr[i] = _bits[i] ^ bitsToFix[i];
             }
             io.send_data(diffArr, sizeof(bool) * _bits.size());
 
@@ -188,7 +188,7 @@ namespace ATLab {
         }
 
         bool at(const size_t pos) const {
-            return _bits.at(pos);
+            return _bits.test(pos);
         }
 
         bool operator[](const size_t pos) const {

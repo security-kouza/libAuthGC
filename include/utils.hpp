@@ -25,12 +25,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <iostream>
 #include <vector>
 #include <utility>
+#include <boost/dynamic_bitset.hpp>
 #include <emp-tool/utils/block.h>
 #include <emp-tool/utils/f2k.h>
 
-#include "PRNG.hpp"
-
 namespace ATLab {
+
+    using Bitset = boost::dynamic_bitset<>;
     static_assert(sizeof(emp::block) == sizeof(__uint128_t));
 
     // Must be locked before printing anything
@@ -56,7 +57,7 @@ namespace ATLab {
     emp::block Block(const std::array<bool, 128>&);
 
     // Little Endian
-    emp::block Block(const std::vector<bool>&);
+    emp::block Block(const Bitset&);
 
     // Little Endian
     emp::block Block(const bool*);
@@ -65,7 +66,7 @@ namespace ATLab {
     emp::block Block(const std::bitset<128>&);
 
     // Little Endian
-    std::vector<bool> to_bool_vector(const emp::block&);
+    Bitset to_bool_vector(const emp::block&);
 
     inline emp::block as_block(const __uint128_t& i128) {
         const auto lo {static_cast<uint64_t>(i128)};

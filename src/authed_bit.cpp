@@ -4,24 +4,28 @@
 
 namespace ATLab {
     namespace {
-        std::vector<bool> blocks_to_bool_vector(const std::vector<emp::block>& blocks) {
-            std::vector<bool> bits;
-            bits.reserve(blocks.size() * BLOCK_BIT_SIZE);
+        Bitset blocks_to_bool_vector(const std::vector<emp::block>& blocks) {
+            const size_t totalBits {blocks.size() * BLOCK_BIT_SIZE};
+            Bitset bits(totalBits);
+            size_t offset {0};
             for (const auto& block : blocks) {
                 const auto blockBits {to_bool_vector(block)};
-                bits.insert(bits.end(), blockBits.begin(), blockBits.end());
+                for (size_t bitIter {0}; bitIter != BLOCK_BIT_SIZE; ++bitIter) {
+                    bits[offset + bitIter] = blockBits[bitIter];
+                }
+                offset += BLOCK_BIT_SIZE;
             }
             return bits;
         }
 
-        std::vector<emp::block> bits_to_blocks(const std::vector<bool>& bits) {
+        std::vector<emp::block> bits_to_blocks(const Bitset& bits) {
             std::vector<emp::block> blocks;
             const size_t blockCount {bits.size() / BLOCK_BIT_SIZE};
             blocks.reserve(blockCount);
             std::bitset<BLOCK_BIT_SIZE> bitChunk;
             for (size_t blockIter {0}; blockIter != blockCount; ++blockIter) {
                 for (size_t bitIter {0}; bitIter != BLOCK_BIT_SIZE; ++bitIter) {
-                    bitChunk[bitIter] = bits.at(blockIter * BLOCK_BIT_SIZE + bitIter);
+                    bitChunk[bitIter] = bits.test(blockIter * BLOCK_BIT_SIZE + bitIter);
                 }
                 blocks.push_back(Block(bitChunk));
             }
@@ -64,7 +68,7 @@ namespace ATLab {
     }
 
     ITMacBlocks::ITMacBlocks(
-        const std::vector<bool>& bits,
+        const Bitset& bits,
         std::vector<emp::block> macs,
         const size_t deltaArrSize
     ):
