@@ -117,6 +117,10 @@ namespace ATLab::GlobalKeySampling {
         const emp::block& get_alpha_0() const {
             return _alpha_0;
         }
+
+        BlockCorrelatedOT::Sender& get_COT_sender() const {
+            return *_pSid0;
+        }
     };
 
     class Evaluator {
@@ -214,6 +218,10 @@ namespace ATLab::GlobalKeySampling {
 
         const emp::block& get_beta_0() const {
             return _beta_0;
+        }
+
+        BlockCorrelatedOT::Receiver& get_COT_receiver() {
+            return _sid0;
         }
     };
 }
