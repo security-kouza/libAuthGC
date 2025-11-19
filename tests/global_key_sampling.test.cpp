@@ -13,7 +13,6 @@ const std::string ADDRESS {"127.0.0.1"};
 constexpr unsigned short PORT {12345};
 
 TEST(Global_Key_Sampling, DEFAULT) {
-
     emp::block deltaA, deltaB, alpha0, beta0;
 
     std::thread garblerThread{[&](){

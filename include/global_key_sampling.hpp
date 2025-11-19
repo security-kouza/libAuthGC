@@ -144,9 +144,8 @@ namespace ATLab::GlobalKeySampling {
             auto authedDeltaB {ITMacBlocks{io, _sid0, {_delta}}};
             const uint8_t lsbMDeltaB {get_LSB(authedDeltaB.get_mac(0))};
             uint8_t lsbKDeltaB;
-            // TODO: parallel send
-            io.recv_data(&lsbKDeltaB, sizeof(lsbKDeltaB));
             io.send_data(&lsbMDeltaB, sizeof(lsbMDeltaB));
+            io.recv_data(&lsbKDeltaB, sizeof(lsbKDeltaB));
             if (lsbKDeltaB == lsbMDeltaB) {
                 authedDeltaB.flip_block_lsb();
                 _delta = authedDeltaB.get_block();
