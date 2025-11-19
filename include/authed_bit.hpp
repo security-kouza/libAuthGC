@@ -8,8 +8,8 @@
 #include <emp-tool/utils/block.h>
 
 #include "params.hpp"
-#include "utils.hpp"
 #include "block_correlated_OT.hpp"
+#include "ATLab/matrix.h"
 
 namespace ATLab {
     class ITMacBlocks {
@@ -187,6 +187,7 @@ namespace ATLab {
             return _macs.size() / _bits.size();
         }
 
+        // TODO: rename it to test
         bool at(const size_t pos) const {
             return _bits.test(pos);
         }
@@ -203,6 +204,8 @@ namespace ATLab {
             const size_t GLOBAL_KEY_SIZE {global_key_size()};
             return ITMacBlocks{_bits, std::move(_macs), GLOBAL_KEY_SIZE};
         }
+
+        friend ITMacBits operator*(const Matrix<bool>&, const ITMacBits&);
     };
 
     class ITMacBitKeys {
@@ -286,8 +289,9 @@ namespace ATLab {
         ITMacBlockKeys polyval_to_Blocks() && {
             return ITMacBlockKeys{_localKeys, std::move(_globalKeys)};
         }
-    };
 
+        friend ITMacBitKeys operator*(const Matrix<bool>&, const ITMacBitKeys&);
+    };
 }
 
 #endif // ATLab_AUTHED_BIT_HPP

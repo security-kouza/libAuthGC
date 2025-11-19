@@ -199,8 +199,8 @@ namespace ATLab::GlobalKeySampling {
             std::array<uint8_t, DIGEST_SIZE> hashRes {};
             emp::Hash::hash_once(hashRes.data(), &toHash, sizeof(toHash));
             std::array<uint8_t, HALF_DIGEST_SIZE> highHash {};
-            io.recv_data(highHash.data(), HALF_DIGEST_SIZE);
             io.send_data(hashRes.data() + HALF_DIGEST_SIZE, HALF_DIGEST_SIZE);
+            io.recv_data(highHash.data(), HALF_DIGEST_SIZE);
 
             const auto expectedHigh {*reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data())};
             if (expectedHigh != highHash) {

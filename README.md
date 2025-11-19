@@ -33,3 +33,7 @@ The test binary `EOTKyber-test` is built under `build/bin` (or other `<path-to-b
 
 If macro `DEBUG_FIXED_SEED` is defined, seed `0` is used. 
 Use of `ENABLE_RDSEED` is deprecated, since most Linux distributions already use `RDSEED` and other hardware randomness to seed `/dev/urandom`.
+
+## TODO
+
+- Rewrite functions to template functions for compile time optimization

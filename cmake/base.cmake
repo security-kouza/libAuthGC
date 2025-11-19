@@ -55,6 +55,8 @@ elseif(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif(CMAKE_BUILD_TYPE MATCHES Debug)
 
+message(STATUS "${Blue}Platform: ${CMAKE_SYSTEM_PROCESSOR}${ColourReset}")
+
 
 #Compilation flags
 string(JOIN " " CMAKE_C_FLAGS
@@ -66,8 +68,6 @@ string(JOIN " " CMAKE_C_FLAGS
     -Wno-ignored-attributes # Suppress warnings about alignment of std::vector<__m128i>
     -msse4
 )
-message(STATUS "${Blue}Platform: ${CMAKE_SYSTEM_PROCESSOR}${ColourReset}")
-
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "(aarch64)|(arm64)")
     set(ARCH_ARM ON)
 endif()
@@ -81,7 +81,7 @@ endif()
 if(DEBUG)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -g -O0")
 else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native -flto")
 endif()
 string(STRIP ${CMAKE_C_FLAGS} CMAKE_C_FLAGS)
 message(STATUS "  C Flags: ${CMAKE_C_FLAGS}")
@@ -90,7 +90,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS} -std=c++17")
 string(STRIP ${CMAKE_CXX_FLAGS} CMAKE_CXX_FLAGS)
 message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 
-# Compile Options
+
+if(NOT DEBUG)
+    add_link_options(-flto)
+endif (NOT DEBUG)
+
+# Compile Options/Macros
 add_compile_options(-DKYBER_90S)
 
 if(DEBUG_FIXED_SEED)

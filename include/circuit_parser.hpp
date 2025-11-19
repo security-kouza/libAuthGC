@@ -19,7 +19,7 @@ namespace ATLab {
 
 		// Ctor for XOR, AND
 		Gate(const char typeInitLetter, const Wire inFirst, const Wire inSecond, const Wire output):
-			type {(typeInitLetter == 'X') ? Type::XOR : Type::AND},
+			type {(typeInitLetter == 'A') ? Type::AND : Type::XOR},
 			in0 {inFirst},
 			in1 {inSecond},
 			out {output}
@@ -34,33 +34,39 @@ namespace ATLab {
 		{}
 	};
 
-	class Circuit {
-		size_t _gateSize, _wireSize, _inputSize0, _inputSize1, _outputSize;
-		std::vector<Gate> _gates;
-	public:
-		explicit Circuit(const std::string& filename) {
+	struct Circuit {
+		size_t gateSize, wireSize, inputSize0, inputSize1, outputSize;
+		size_t andGateSize;
+		std::vector<Gate> gates;
+		explicit Circuit(const std::string& filename):
+			andGateSize {0}
+		{
 			std::ifstream fin {filename};
 			if (!fin) {
 				throw std::runtime_error("Cannot open file " + filename);
 			}
 
-			fin >> _gateSize >> _wireSize;
-			_gates.reserve(gate_size());
+			fin >> gateSize >> wireSize;
+			gates.reserve(gateSize);
 
-			fin >> _inputSize0 >> _inputSize1 >> _outputSize;
+			fin >> inputSize0 >> inputSize1 >> outputSize;
 			fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-			for (size_t i {0}; i != gate_size(); ++i) {
+			for (size_t i {0}; i != gateSize; ++i) {
 				if (fin.get() == '2') {
 					// XOR or AND
 					fin.ignore(3); // ignores " 1 "
 					Wire in0, in1, out;
 					fin >> in0 >> in1 >> out;
 
-					char GateInitLetter;
-					fin >> GateInitLetter;
+					char gateInitLetter;
+					fin >> gateInitLetter;
 					fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-					_gates.emplace_back(GateInitLetter, in0, in1, out);
+
+					if (gateInitLetter == 'A') {
+						++andGateSize;
+					}
+					gates.emplace_back(gateInitLetter, in0, in1, out);
 				} else {
 					// NOT
 					fin.ignore(3); // ignores " 1 "
@@ -68,17 +74,9 @@ namespace ATLab {
 					fin >> in >> out;
 					fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-					_gates.emplace_back(in, out);
+					gates.emplace_back(in, out);
 				}
 			}
-		}
-
-		size_t gate_size() const {
-			return _gateSize;
-		}
-
-		size_t wire_size() const {
-			return _wireSize;
 		}
 	};
 }
