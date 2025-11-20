@@ -24,11 +24,11 @@ namespace {
 
         const size_t blockSize {calc_bitset_blockSize(bitSize)};
         std::vector<BitsetBlock> rawData(blockSize);
-        io.recv_data(rawData.data(), rawData.size());
+        io.recv_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
 
         Bitset bitset {rawData.cbegin(), rawData.cend()};
         bitset.resize(bitSize);
-        return {n, L, bitset};
+        return {n, L, std::move(bitset)};
     }
 
     Matrix<bool> gen_and_send_matrix(emp::NetIO& io, const size_t n, const size_t L) {
@@ -37,7 +37,7 @@ namespace {
         std::vector<BitsetBlock> rawData(blockSize);
         THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
 
-        io.send_data(rawData.data(), rawData.size());
+        io.send_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
         Bitset bitset (rawData.cbegin(), rawData.cend());
         bitset.resize(bitSize);
         return {n, L, std::move(bitset)};

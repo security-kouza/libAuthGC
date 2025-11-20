@@ -11,15 +11,20 @@ constexpr unsigned short PORT {12345};
 
 TEST(Preprocess, DEFAULT) {
     const auto circuit {ATLab::Circuit("circuits/bristol_format/sha-1.txt")};
+    ATLab::Bitset garblerRawMatrix, evaluatorRawMatrix;
 
     std::thread garblerThread{[&](){
         emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
         auto garblerMatrix {ATLab::Garbler::preprocess(io, circuit)};
+        garblerRawMatrix = garblerMatrix.data;
     }}, evaluatorThread{[&]() {
         emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
         auto evaluatorMatrix {ATLab::Evaluator::preprocess(io, circuit)};
+        evaluatorRawMatrix = evaluatorMatrix.data;
     }};
 
     garblerThread.join();
     evaluatorThread.join();
+
+    EXPECT_EQ(garblerRawMatrix, evaluatorRawMatrix);
 }
