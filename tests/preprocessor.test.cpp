@@ -11,7 +11,7 @@ constexpr unsigned short PORT {12345};
 
 TEST(Preprocess, DEFAULT) {
     const auto circuit {ATLab::Circuit("circuits/bristol_format/sha-1.txt")};
-    ATLab::Bitset garblerRawMatrix, evaluatorRawMatrix;
+    std::vector<uint64_t> garblerRawMatrix, evaluatorRawMatrix;
 
     std::thread garblerThread{[&](){
         emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);

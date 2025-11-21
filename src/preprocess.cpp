@@ -20,27 +20,19 @@ namespace {
     using namespace ATLab;
 
     Matrix<bool> get_matrix(emp::NetIO& io, const size_t n, const size_t L) {
-        const size_t bitSize {n * L};
-
-        const size_t blockSize {calc_bitset_blockSize(bitSize)};
-        std::vector<BitsetBlock> rawData(blockSize);
-        io.recv_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
-
-        Bitset bitset {rawData.cbegin(), rawData.cend()};
-        bitset.resize(bitSize);
-        return {n, L, std::move(bitset)};
+        const size_t blockSize {calc_matrix_blockSize(n, L)};
+        std::vector<MatrixBlock> rawData(blockSize);
+        io.recv_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        return {n, L, std::move(rawData)};
     }
 
     Matrix<bool> gen_and_send_matrix(emp::NetIO& io, const size_t n, const size_t L) {
-        const size_t bitSize {n * L};
-        const size_t blockSize {calc_bitset_blockSize(bitSize)};
-        std::vector<BitsetBlock> rawData(blockSize);
-        THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
-
-        io.send_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
-        Bitset bitset (rawData.cbegin(), rawData.cend());
-        bitset.resize(bitSize);
-        return {n, L, std::move(bitset)};
+        const size_t blockSize {calc_matrix_blockSize(n, L)};
+        std::vector<MatrixBlock> rawData(blockSize);
+        THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        zero_matrix_row_padding(rawData, n, L);
+        io.send_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        return {n, L, std::move(rawData)};
     }
 }
 
