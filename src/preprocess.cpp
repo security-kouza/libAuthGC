@@ -3,16 +3,8 @@
 #include <sstream>
 #include <boost/core/span.hpp>
 
+#include <ATLab/benchmark.hpp>
 #include "global_key_sampling.hpp"
-
-#define BENCHMARK(message, code) \
-    start = std::chrono::high_resolution_clock::now();\
-    code\
-    end = std::chrono::high_resolution_clock::now();\
-    std::cout << #message << ": "\
-    << std::chrono::duration<double, std::milli>{end - start}.count() << "ms\n";
-
-#define BENCHMARK_INIT std::chrono::time_point<std::chrono::system_clock> start, end;
 
 // TODO: n, L need names
 
@@ -50,7 +42,10 @@ namespace ATLab {
             // 2
             const ITMacBitKeys bStarKeys {globalKey.get_COT_sender(), compressParam};
 
+BENCHMARK_INIT
+BENCHMARK(Matrix multiplication | Garbler,
             const auto bKeys {matrix * bStarKeys};
+);
 
             return matrix;
         }
@@ -58,22 +53,24 @@ namespace ATLab {
 
     namespace Evaluator {
         Matrix<bool> preprocess(emp::NetIO& io, const Circuit& circuit) {
-            std::chrono::time_point<std::chrono::system_clock> start, end;
-            BENCHMARK(Global key sampling time,
+BENCHMARK_INIT
+BENCHMARK(Global key sampling time,
                 GlobalKeySampling::Evaluator globalKey {io};
-            );
+);
             const auto n {circuit.andGateSize + circuit.inputSize1};
             const auto compressParam {static_cast<size_t>(calc_compression_parameter(n))};
             const auto m {n + circuit.inputSize0};
 
-            BENCHMARK(Matrix generation time,
+BENCHMARK(Matrix generation time,
                 const auto matrix {gen_and_send_matrix(io, n, compressParam)};
-            );
+);
 
             // 2
             const ITMacBits bStar {globalKey.get_COT_receiver(), compressParam};
 
+BENCHMARK(Matrix multiplication | Garbler,
             const auto b {matrix * bStar};
+);
 
             return matrix;
         }

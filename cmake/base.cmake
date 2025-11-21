@@ -93,7 +93,7 @@ message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 
 if(NOT DEBUG)
     add_link_options(-flto)
-endif (NOT DEBUG)
+endif(NOT DEBUG)
 
 # Compile Options/Macros
 add_compile_options(-DKYBER_90S)
@@ -101,6 +101,10 @@ add_compile_options(-DKYBER_90S)
 if(DEBUG_FIXED_SEED)
     add_compile_options(-DDEBUG_FIXED_SEED)
 endif(DEBUG_FIXED_SEED)
+
+if(ENABLE_BENCHMARK)
+    add_compile_options(-DENABLE_BENCHMARK)
+endif(ENABLE_BENCHMARK)
 
 # RDSEED
 include(${CMAKE_SOURCE_DIR}/cmake/enable_rdseed.cmake)
