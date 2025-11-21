@@ -58,6 +58,8 @@ namespace ATLab {
             // 2
             const ITMacBitKeys bStarKeys {globalKey.get_COT_sender(), compressParam};
 
+            const auto bKeys {matrix * bStarKeys};
+
             return matrix;
         }
     }
@@ -78,6 +80,8 @@ namespace ATLab {
 
             // 2
             const ITMacBits bStar {globalKey.get_COT_receiver(), compressParam};
+
+            const auto b {matrix * bStar};
 
             return matrix;
         }

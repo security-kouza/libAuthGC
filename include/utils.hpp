@@ -32,6 +32,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 namespace ATLab {
 
     using Bitset = boost::dynamic_bitset<>;
+    using BitsetBlock = Bitset::block_type;
     static_assert(sizeof(emp::block) == sizeof(__uint128_t));
 
     // Must be locked before printing anything

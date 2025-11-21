@@ -60,7 +60,7 @@ set(HEADER
     include/DVZK.hpp
     include/circuit_parser.hpp
     include/ATLab/preprocess.hpp
-    include/ATLab/matrix.h
+    include/ATLab/matrix.hpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})
