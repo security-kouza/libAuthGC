@@ -30,49 +30,87 @@ namespace {
 
 namespace ATLab {
     namespace Garbler {
-        Matrix<bool> preprocess(emp::NetIO& io, const Circuit& circuit) {
+        PreprocessedData preprocess(emp::NetIO& io, const Circuit& circuit) {
             const GlobalKeySampling::Garbler globalKey {io};
 
             const auto n {circuit.andGateSize + circuit.inputSize1};
             const auto compressParam {static_cast<size_t>(calc_compression_parameter(n))};
             const auto m {n + circuit.inputSize0};
 
-            const auto matrix {get_matrix(io, n, compressParam)};
+            auto matrix {get_matrix(io, n, compressParam)};
 
             // 2
             const ITMacBitKeys bStarKeys {globalKey.get_COT_sender(), compressParam};
+            auto bKeys {matrix * bStarKeys};
 
-BENCHMARK_INIT
-BENCHMARK(Matrix multiplication | Garbler,
-            const auto bKeys {matrix * bStarKeys};
-);
+            // 3
+            const ITMacBlockKeys dualAuthedBStar{io, globalKey.get_COT_sender(), compressParam};
 
-            return matrix;
+            // 4
+            BlockCorrelatedOT::Receiver sid1 {io, compressParam + 1};
+            ITMacBits aMatrix {sid1, m};
+
+            emp::block tmpDelta;
+            THE_GLOBAL_PRNG.random_block(&tmpDelta, 1);
+            ITMacBlocks authedTmpDelta {io, sid1, {tmpDelta}};
+
+            // 5
+            BlockCorrelatedOT::Receiver sid2 {io, 2};
+            const ITMacBits aHatMatrix {sid2, circuit.andGateSize};
+            ITMacBlocks authedTmpDeltaStep5 {io, sid2, {tmpDelta}};
+
+
+            return {std::move(matrix), std::move(bKeys)};
         }
     }
 
     namespace Evaluator {
-        Matrix<bool> preprocess(emp::NetIO& io, const Circuit& circuit) {
-BENCHMARK_INIT
-BENCHMARK(Global key sampling time,
-                GlobalKeySampling::Evaluator globalKey {io};
-);
+        PreprocessedData preprocess(emp::NetIO& io, const Circuit& circuit) {
+BENCHMARK_INIT;
+            GlobalKeySampling::Evaluator globalKey {io};
             const auto n {circuit.andGateSize + circuit.inputSize1};
             const auto compressParam {static_cast<size_t>(calc_compression_parameter(n))};
             const auto m {n + circuit.inputSize0};
 
-BENCHMARK(Matrix generation time,
-                const auto matrix {gen_and_send_matrix(io, n, compressParam)};
-);
+            auto matrix {gen_and_send_matrix(io, n, compressParam)};
 
             // 2
             const ITMacBits bStar {globalKey.get_COT_receiver(), compressParam};
+            auto b {matrix * bStar};
 
-BENCHMARK(Matrix multiplication | Garbler,
-            const auto b {matrix * bStar};
-);
+            // 3
+BENCHMARK_START;
+            std::vector<emp::block> bStarDeltaB;
+            bStarDeltaB.reserve(compressParam);
+            for (size_t i {0}; i != compressParam; ++i) {
+                bStarDeltaB.push_back(bStar[i] ? globalKey.get_delta() : _mm_set_epi64x(0, 0));
+            }
+            ITMacBlocks dualAuthedBStar{io, globalKey.get_COT_receiver(), std::move(bStarDeltaB)};
+BENCHMARK_END(E step 3);
+BENCHMARK_START;
 
-            return matrix;
+            // 4
+            std::vector<emp::block> sid1Keys {std::move(dualAuthedBStar).release_macs()};
+            sid1Keys.push_back(globalKey.get_delta());
+            BlockCorrelatedOT::Sender sid1 {io, std::move(sid1Keys)};
+            const ITMacBitKeys aMatrix {sid1, m};
+
+            ITMacBlockKeys tmpDelta {io, sid1, 1};
+BENCHMARK_END(E step 4);
+
+BENCHMARK_START
+            // 5
+            BlockCorrelatedOT::Sender sid2 {io, {globalKey.get_beta_0(), globalKey.get_delta()}};
+            ITMacBitKeys aHatMatrix {sid2, circuit.andGateSize};
+            ITMacBlockKeys tmpDeltaStep5 {io, sid2, 1};
+BENCHMARK_END(E step 5);
+
+BENCHMARK_START
+            // 6
+
+BENCHMARK_END(E step 6);
+
+            return {std::move(matrix), std::move(b)};
         }
     }
 }

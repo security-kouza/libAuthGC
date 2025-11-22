@@ -28,7 +28,7 @@ namespace ATLab::GlobalKeySampling {
     public:
         explicit Garbler(emp::NetIO& io) {
             const auto high {THE_GLOBAL_PRNG()}, low {THE_GLOBAL_PRNG() | 1};
-            _delta = _mm_set_epi64x(high, low);
+            _delta = _mm_set_epi64x(static_cast<long long>(high), static_cast<long long>(low));
             _pSid0 = std::make_unique<BlockCorrelatedOT::Sender>(io, std::vector{_delta});
 
             // 1
@@ -128,7 +128,10 @@ namespace ATLab::GlobalKeySampling {
         BlockCorrelatedOT::Receiver _sid0;
     public:
         explicit Evaluator(emp::NetIO& io) :
-            _delta {_mm_set_epi64x(THE_GLOBAL_PRNG(), THE_GLOBAL_PRNG())},
+            _delta {_mm_set_epi64x(
+                static_cast<long long>(THE_GLOBAL_PRNG()),
+                static_cast<long long>(THE_GLOBAL_PRNG())
+            )},
             _sid0 {io, 1}
         {
             // 1

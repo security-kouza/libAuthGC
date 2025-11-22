@@ -61,8 +61,9 @@ namespace ATLab {
         std::vector<Block64> data;
 
         Matrix() = default;
+        Matrix(Matrix&&) = default;
 
-        Matrix(size_t rows, size_t cols, std::vector<Block64> storage):
+        Matrix(const size_t rows, const size_t cols, std::vector<Block64> storage):
             rowSize(rows),
             colSize(cols),
             data(std::move(storage))

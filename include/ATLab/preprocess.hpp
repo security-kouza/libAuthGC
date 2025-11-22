@@ -29,22 +29,28 @@ namespace ATLab {
         struct PreprocessedData {
             // TODO: names!!!
             Matrix<bool> matrix;
-            ITMacBits a, aHat;
-            ITMacBitKeys bStar, bHat;
+            ITMacBitKeys bKeys;
+            // ITMacBits a;
+            // ITMacBits aHat;
+            // ITMacBitKeys bStar;
+            // ITMacBitKeys bHat;
         };
 
-        Matrix<bool> preprocess(emp::NetIO&, const Circuit&);
+        PreprocessedData preprocess(emp::NetIO&, const Circuit&);
     }
 
     namespace Evaluator {
         struct PreprocessedData {
             // TODO: names!!!
             Matrix<bool> matrix;
-            ITMacBits bStar, bHat;
-            ITMacBitKeys a, aHat;
+            ITMacBits b;
+            // ITMacBitKeys a;
+            // ITMacBitKeys aHat;
+            // ITMacBits bStar;
+            // ITMacBits bHat;
         };
 
-        Matrix<bool> preprocess(emp::NetIO&, const Circuit&);
+        PreprocessedData preprocess(emp::NetIO&, const Circuit&);
     }
 }
 

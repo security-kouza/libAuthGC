@@ -58,6 +58,10 @@ namespace ATLab {
         void flip_block_lsb(const size_t blockPos = 0) {
             _blocks.at(blockPos) = _mm_xor_si128(_blocks.at(blockPos), _mm_set_epi64x(0, 1));
         }
+
+        std::vector<emp::block> release_macs() && {
+            return std::move(_macs);
+        }
     };
 
     class ITMacBlockKeys {
@@ -132,6 +136,7 @@ namespace ATLab {
         std::vector<emp::block> _macs; // _macs.size() == _bits.size() * deltaArrSize
     public:
         ITMacBits() = delete;
+        ITMacBits(ITMacBits&&) = default;
 
         /**
          * Direct construction.
@@ -214,6 +219,8 @@ namespace ATLab {
 
     public:
         ITMacBitKeys() = delete;
+        ITMacBitKeys(ITMacBitKeys&&) = default;
+
         ITMacBitKeys(std::vector<emp::block>&& localKeys, std::vector<emp::block> globalKeys):
             _localKeys {std::move(localKeys)},
             _globalKeys {std::move(globalKeys)}

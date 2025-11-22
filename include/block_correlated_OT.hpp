@@ -1,6 +1,7 @@
 #ifndef ATLab_CORRELATED_OT_HPP
 #define ATLab_CORRELATED_OT_HPP
 
+#include <utility>
 #include <vector>
 #include <emp-tool/utils/block.h>
 #include <emp-ot-original/iknp.h>
@@ -21,8 +22,8 @@ namespace ATLab::BlockCorrelatedOT {
         OT _ot;
     public:
         const size_t deltaArrSize;
-        Sender(emp::NetIO& io, const std::vector<emp::block>& deltaArr) :
-            _deltaArr(deltaArr),
+        Sender(emp::NetIO& io, std::vector<emp::block> deltaArr) :
+            _deltaArr(std::move(deltaArr)),
             _ot {&io, false},
             deltaArrSize {_deltaArr.size()}
         {

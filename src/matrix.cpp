@@ -18,7 +18,7 @@ namespace ATLab {
             if (blockCount < requiredBlocks) {
                 std::ostringstream sout;
                 sout << "Bitset requires " << requiredBlocks << " blocks but only "
-                     << blockCount << " provided.\n";
+                    << blockCount << " provided.\n";
                 throw std::invalid_argument{sout.str()};
             }
 #endif // DEBUG
@@ -110,7 +110,7 @@ namespace ATLab {
         if (matrix.colSize != authedBits._bits.size()) {
             std::ostringstream sout;
             sout << "Sizes mismatch: matrix columns " << matrix.colSize
-                 << ", authedBits " << authedBits._bits.size() << "\n";
+                << ", authedBits " << authedBits._bits.size() << "\n";
             throw std::invalid_argument{sout.str()};
         }
 #endif // DEBUG
