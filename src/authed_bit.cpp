@@ -48,6 +48,24 @@ namespace ATLab {
             }
             return blockMacs;
         }
+
+        Bitset scaled_block_bits(const emp::block& scalarBlock, const Bitset& selectors) {
+            const size_t blockCount {selectors.size()};
+            Bitset bits(blockCount * BLOCK_BIT_SIZE);
+            if (!selectors.any()) {
+                return bits;
+            }
+            const Bitset blockBits {to_bool_vector(scalarBlock)};
+            for (auto pos {selectors.find_first()}; pos != Bitset::npos; pos = selectors.find_next(pos)) {
+                const size_t offset {pos * BLOCK_BIT_SIZE};
+                for (size_t bitIter {0}; bitIter != BLOCK_BIT_SIZE; ++bitIter) {
+                    if (blockBits[bitIter]) {
+                        bits.set(offset + bitIter);
+                    }
+                }
+            }
+            return bits;
+        }
     }
 
     ITMacBlocks::ITMacBlocks(
@@ -132,6 +150,40 @@ namespace ATLab {
             }()
         }
     {}
+
+    ITMacScaledBits::ITMacScaledBits(
+        emp::NetIO& io,
+        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const emp::block& scalarBlock,
+        const Bitset& blockSelectors
+    ):
+        _selectors {blockSelectors},
+        _scalar {scalarBlock}
+    {
+        const size_t blockCount {_selectors.size()};
+        if (!blockCount) {
+            throw std::invalid_argument{"blockSelectors cannot be empty."};
+        }
+
+        auto bitsToFix {scaled_block_bits(scalarBlock, _selectors)};
+        const ITMacBits fixedBits {io, bCOTReceiver, std::move(bitsToFix)};
+
+        const size_t totalBits {fixedBits.size()};
+        if (!totalBits || totalBits % BLOCK_BIT_SIZE != 0) {
+            throw std::invalid_argument{"Wrong parameter sizes."};
+        }
+
+        if (blockCount * BLOCK_BIT_SIZE != totalBits) {
+            throw std::invalid_argument{"Wrong parameter sizes."};
+        }
+
+        const size_t globalKeySize {fixedBits.global_key_size()};
+        if (globalKeySize != 1) {
+            throw std::invalid_argument{"ITMacScaledBits only supports a single global key."};
+        }
+
+        _macs = polyval_mac_chunks(fixedBits._macs.data(), totalBits, globalKeySize, blockCount);
+    }
 
     ITMacBlockKeys::ITMacBlockKeys(
         BlockCorrelatedOT::Sender& bCOTSender,

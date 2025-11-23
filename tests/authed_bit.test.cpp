@@ -236,3 +236,70 @@ TEST(Authed_Bit, fixed_blocks) {
         }
     }
 }
+
+TEST(Authed_Bit, fixed_blocks_scalar_bitset) {
+    constexpr size_t deltaSize {1};
+    constexpr size_t blockSize {40};
+    constexpr unsigned short LOCAL_PORT {static_cast<unsigned short>(PORT + 3)};
+
+    std::vector<emp::block> deltaArr(deltaSize);
+    auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
+    for (auto& delta : deltaArr) {
+        delta = ATLab::as_block(prng());
+    }
+
+    const emp::block scalarBlock {ATLab::as_block(prng())};
+    ATLab::Bitset blockSelectors {ATLab::random_dynamic_bitset(blockSize)};
+    if (!blockSelectors.any()) {
+        blockSelectors.set(0);
+    }
+
+    std::unique_ptr<ATLab::ITMacBlockKeys> keys;
+    std::unique_ptr<ATLab::ITMacScaledBits> authedBlocks;
+
+    std::thread bCOTSenderThread{
+        [&]() {
+            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, LOCAL_PORT, true);
+            ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+            keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockSize);
+        }
+    }, bCOTReceiverThread{
+        [&, blockSelectors]() {
+            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, LOCAL_PORT, true);
+            ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
+            authedBlocks = std::make_unique<ATLab::ITMacScaledBits>(io, receiver, scalarBlock, blockSelectors);
+        }
+    };
+
+    bCOTSenderThread.join();
+    bCOTReceiverThread.join();
+
+    ASSERT_EQ(keys->size(), blockSize);
+    ASSERT_EQ(keys->global_key_size(), deltaSize);
+
+    ASSERT_NE(authedBlocks, nullptr);
+    EXPECT_EQ(authedBlocks->size(), blockSize);
+    EXPECT_EQ(authedBlocks->global_key_size(), 1);
+    EXPECT_EQ(blockSelectors, authedBlocks->selectors());
+    EXPECT_EQ(ATLab::as_uint128(scalarBlock), ATLab::as_uint128(authedBlocks->scalar()));
+
+    for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
+        const auto expectedBlock {
+            blockSelectors.test(blockIter) ? ATLab::as_uint128(scalarBlock) : ATLab::as_uint128(emp::zero_block)
+        };
+        EXPECT_EQ(expectedBlock, ATLab::as_uint128(authedBlocks->get_block(blockIter)));
+    }
+
+    for (size_t i {0}; i != deltaSize; ++i) {
+        EXPECT_EQ(ATLab::as_uint128(deltaArr.at(i)), ATLab::as_uint128(keys->get_global_key(i)));
+    }
+
+    emp::block tmpProd;
+    for (size_t blockIter {0}; blockIter != blockSize; ++blockIter) {
+        emp::gfmul(deltaArr.front(), authedBlocks->get_block(blockIter), &tmpProd);
+        const auto expected {
+            ATLab::as_uint128(keys->get_local_key(0, blockIter) ^ tmpProd)
+        };
+        EXPECT_EQ(expected, ATLab::as_uint128(authedBlocks->get_mac(blockIter)));
+    }
+}

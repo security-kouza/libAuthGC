@@ -64,6 +64,44 @@ namespace ATLab {
         }
     };
 
+    class ITMacScaledBits {
+        Bitset _selectors;
+        std::vector<emp::block> _macs;
+        emp::block _scalar;
+
+    public:
+        ITMacScaledBits(
+            emp::NetIO&,
+            BlockCorrelatedOT::Receiver&,
+            const emp::block& scalarBlock,
+            const Bitset& blockSelectors
+        );
+
+        size_t size() const {
+            return _selectors.size();
+        }
+
+        const Bitset& selectors() const {
+            return _selectors;
+        }
+
+        const emp::block& scalar() const {
+            return _scalar;
+        }
+
+        emp::block get_block(const size_t blockPos = 0) const {
+            return _selectors.test(blockPos) ? _scalar : emp::zero_block;
+        }
+
+        const emp::block& get_mac(const size_t blockPos = 0) const {
+            return _macs.at(blockPos);
+        }
+
+        size_t global_key_size() const {
+            return 1;
+        }
+    };
+
     class ITMacBlockKeys {
         std::vector<emp::block> _localKeys; // flattened by global key then block index
         std::vector<emp::block> _globalKeys;
@@ -131,6 +169,7 @@ namespace ATLab {
 
     class ITMacBits {
         friend class ITMacBlocks;
+        friend class ITMacScaledBits;
 
         Bitset _bits;
         std::vector<emp::block> _macs; // _macs.size() == _bits.size() * deltaArrSize
