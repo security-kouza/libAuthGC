@@ -27,7 +27,7 @@ namespace ATLab {
 
 		// Ctor for NOT
 		Gate(const Wire input, const Wire output):
-			type {Type::XOR},
+			type {Type::NOT},
 			in0 {input},
 			in1 {DISABLED},
 			out {output}
@@ -35,7 +35,7 @@ namespace ATLab {
 	};
 
 	struct Circuit {
-		size_t gateSize, wireSize, inputSize0, inputSize1, outputSize;
+		size_t gateSize, wireSize, inputSize0, inputSize1, totalInputSize, outputSize;
 		size_t andGateSize;
 		std::vector<Gate> gates;
 		explicit Circuit(const std::string& filename):
@@ -50,6 +50,7 @@ namespace ATLab {
 			gates.reserve(gateSize);
 
 			fin >> inputSize0 >> inputSize1 >> outputSize;
+			totalInputSize = inputSize0 + inputSize1;
 			fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
 			for (size_t i {0}; i != gateSize; ++i) {
@@ -68,7 +69,7 @@ namespace ATLab {
 					}
 					gates.emplace_back(gateInitLetter, in0, in1, out);
 				} else {
-					// NOT
+					// INV, i.e., NOT
 					fin.ignore(3); // ignores " 1 "
 					Wire in, out;
 					fin >> in >> out;
