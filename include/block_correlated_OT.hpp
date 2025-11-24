@@ -3,6 +3,8 @@
 
 #include <utility>
 #include <vector>
+#include <memory>
+#include <stdexcept>
 #include <emp-tool/utils/block.h>
 #include <emp-ot-original/iknp.h>
 
@@ -13,21 +15,41 @@
 // using IKNP
 namespace ATLab::BlockCorrelatedOT {
 
-    // TODO: possible optimization: making OT shared across IKNP instances
-
     using OT = emp::IKNP<emp::NetIO>;
 
     class Sender {
+        static std::unique_ptr<OT>& shared_ot_storage() {
+            static std::unique_ptr<OT> instance;
+            return instance;
+        }
+
+        static OT& get_simple_ot(emp::NetIO& io) {
+            auto& instance = shared_ot_storage();
+            if (!instance) {
+                instance = std::make_unique<OT>(&io, false);
+                instance->setup_send();
+            } else if (instance->io != &io) {
+                throw std::runtime_error{"Shared IKNP sender OT already bound to a different NetIO"};
+            }
+            return *instance;
+        }
+
+        static OT& get_simple_ot() {
+            auto& instance = shared_ot_storage();
+            if (!instance) {
+                throw std::logic_error("Shared IKNP sender OT is not initialized");
+            }
+            return *instance;
+        }
+
         const std::vector<emp::block> _deltaArr;
-        OT _ot;
     public:
         const size_t deltaArrSize;
         Sender(emp::NetIO& io, std::vector<emp::block> deltaArr) :
             _deltaArr(std::move(deltaArr)),
-            _ot {&io, false},
             deltaArrSize {_deltaArr.size()}
         {
-            _ot.setup_send();
+            get_simple_ot(io);
         }
 
         /**
@@ -48,7 +70,7 @@ namespace ATLab::BlockCorrelatedOT {
                     k2Vec.at(i * len + j) = k1Vec.at(i * len + j) ^ _deltaArr.at(i);
                 }
             }
-            _ot.send(k1Vec.data(), k2Vec.data(), otSize);
+            get_simple_ot().send(k1Vec.data(), k2Vec.data(), otSize);
             return k1Vec;
         }
 
@@ -62,15 +84,37 @@ namespace ATLab::BlockCorrelatedOT {
     };
 
     class Receiver {
-        OT _ot;
+        static std::unique_ptr<OT>& shared_ot_storage() {
+            static std::unique_ptr<OT> instance;
+            return instance;
+        }
+
+        static OT& get_simple_ot(emp::NetIO& io) {
+            auto& instance = shared_ot_storage();
+            if (!instance) {
+                instance = std::make_unique<OT>(&io, false);
+                instance->setup_recv();
+            } else if (instance->io != &io) {
+                throw std::runtime_error{"Shared IKNP receiver OT already bound to a different NetIO"};
+            }
+            return *instance;
+        }
+
+        static OT& get_simple_ot() {
+            auto& instance = shared_ot_storage();
+            if (!instance) {
+                throw std::logic_error("Shared IKNP receiver OT is not initialized");
+            }
+            return *instance;
+        }
+
     public:
         const size_t deltaArrSize; // L
 
         Receiver(emp::NetIO& io, const size_t deltaArrSize) :
-            _ot {&io, false},
             deltaArrSize {deltaArrSize}
         {
-            _ot.setup_recv();
+            get_simple_ot(io);
         }
 
         std::tuple<Bitset, std::vector<emp::block>> extend(const size_t len) {
@@ -87,7 +131,7 @@ namespace ATLab::BlockCorrelatedOT {
                 }
             }
 
-            _ot.recv(macArr.data(), choicesForOT, otSize);
+            get_simple_ot().recv(macArr.data(), choicesForOT, otSize);
 
             delete[] choicesForOT;
             return {choices, macArr};
