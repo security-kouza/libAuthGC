@@ -69,6 +69,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${LIB})
 
 
 if (ENABLE_TEST)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC PARTY_INSTANCES_PER_THREAD=2)
     FetchContent_Declare(
         googletest
         URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip

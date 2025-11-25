@@ -105,9 +105,10 @@ TEST(BCOT, MULTI_INSTANCE_REUSES_OT) {
                 keys1 = sender.extend(firstLen);
             }
             {
-                auto senderDelta {deltaArr2};
-                ATLab::BlockCorrelatedOT::Sender sender(io, std::move(senderDelta));
-                keys2 = sender.extend(secondLen);
+                ATLab::BlockCorrelatedOT::Receiver receiver(io, secondDeltaSize);
+                auto [c, m] = receiver.extend(secondLen);
+                choices2 = std::move(c);
+                macArr2 = std::move(m);
             }
         }
     };
@@ -122,10 +123,9 @@ TEST(BCOT, MULTI_INSTANCE_REUSES_OT) {
                 macArr1 = std::move(m);
             }
             {
-                ATLab::BlockCorrelatedOT::Receiver receiver(io, secondDeltaSize);
-                auto [c, m] = receiver.extend(secondLen);
-                choices2 = std::move(c);
-                macArr2 = std::move(m);
+                auto senderDelta {deltaArr2};
+                ATLab::BlockCorrelatedOT::Sender sender(io, std::move(senderDelta));
+                keys2 = sender.extend(secondLen);
             }
         }
     };
