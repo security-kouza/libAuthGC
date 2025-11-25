@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <boost/dynamic_bitset.hpp>
+#include <emp-tool/utils/block.h>
 
 #include "utils.hpp"
 
@@ -24,9 +25,9 @@ namespace ATLab {
         Matrix() = default;
 
         Matrix(size_t rows, size_t cols, Storage storage):
-            rowSize(rows),
-            colSize(cols),
-            data(std::move(storage))
+            rowSize {rows},
+            colSize {cols},
+            data {std::move(storage)}
         {
 #ifdef DEBUG
             if (data.size() != rowSize * colSize) {
@@ -64,9 +65,9 @@ namespace ATLab {
         Matrix(Matrix&&) = default;
 
         Matrix(const size_t rows, const size_t cols, std::vector<Block64> storage):
-            rowSize(rows),
-            colSize(cols),
-            data(std::move(storage))
+            rowSize {rows},
+            colSize {cols},
+            data {std::move(storage)}
         {
 #ifdef DEBUG
             if (data.size() != Total_block_count(rows, cols)) {
@@ -114,6 +115,85 @@ namespace ATLab {
 #endif // DEBUG
             const size_t blockPerRow {blocks_per_row()};
             return blockPerRow ? data.data() + row * blockPerRow : data.data();
+        }
+
+        class RowView {
+            const Block64* _blocks;
+            const size_t _blockCount;
+            const size_t _colSize;
+        public:
+            RowView(const Block64* blocks, const size_t blockCount, const size_t colSize):
+                _blocks {blocks},
+                _blockCount {blockCount},
+                _colSize {colSize}
+            {}
+
+            template<class Func>
+            void for_each_set_bit(Func&& fn) const {
+                if (!_blockCount || !_blocks) {
+                    return;
+                }
+                for (size_t blockIter {0}; blockIter < _blockCount; ++blockIter) {
+                    Block64 mask {_blocks[blockIter]};
+                    while (mask) {
+                        const size_t bitOffset {
+                            static_cast<size_t>(__builtin_ctzll(mask))
+                        };
+                        mask &= (mask - 1);
+                        const size_t col {blockIter * bits_per_block + bitOffset};
+                        if (col >= _colSize) {
+                            break;
+                        }
+                        fn(col);
+                    }
+                }
+            }
+
+            template<class BlockContainer>
+            emp::block operator*(const BlockContainer& values) const {
+#ifdef DEBUG
+                if (values.size() != _colSize) {
+                    std::ostringstream sout;
+                    sout << "Sizes mismatch: row has " << _colSize
+                         << " columns but vector has " << values.size() << ".\n";
+                    throw std::invalid_argument{sout.str()};
+                }
+#endif // DEBUG
+                emp::block result {emp::zero_block};
+                if (!_blockCount || !_blocks) {
+                    return result;
+                }
+                for_each_set_bit([&](const size_t colIndex) {
+                    result = _mm_xor_si128(result, values[colIndex]);
+                });
+                return result;
+            }
+
+            bool bitwise_inner_product(const std::vector<Block64>& bitBlocks) const {
+                if (!_blockCount || !_blocks) {
+                    return false;
+                }
+#ifdef DEBUG
+                if (bitBlocks.size() < _blockCount) {
+                    std::ostringstream sout;
+                    sout << "RowView expects at least " << _blockCount
+                         << " parity blocks but received " << bitBlocks.size() << ".\n";
+                    throw std::invalid_argument{sout.str()};
+                }
+#endif // DEBUG
+                bool parityBit {false};
+                for (size_t i {0}; i < _blockCount; ++i) {
+                    const Block64 mask {_blocks[i] & bitBlocks[i]};
+                    parityBit ^= static_cast<bool>(__builtin_popcountll(mask) & 1);
+                }
+                return parityBit;
+            }
+        };
+
+        RowView row(const size_t rowIndex) const {
+            const size_t blockPerRow {blocks_per_row()};
+            const Block64* rowBlocks {blockPerRow ? row_data(rowIndex) : nullptr};
+            return RowView{rowBlocks, blockPerRow, colSize};
         }
 
         bool at(const size_t i, const size_t j) const {

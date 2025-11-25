@@ -29,39 +29,6 @@ namespace ATLab {
             return blocks;
         }
 
-        class RowView {
-            const MatrixBlock* _blocks;
-            const size_t _blockCount;
-            const size_t _colSize;
-        public:
-            RowView(const MatrixBlock* blocks, const size_t blockCount, const size_t colSize):
-                _blocks(blocks),
-                _blockCount(blockCount),
-                _colSize(colSize)
-            {}
-
-            template<class Func>
-            void for_each_set_bit(Func&& fn) const {
-                if (!_blockCount) {
-                    return;
-                }
-                for (size_t blockIter {0}; blockIter < _blockCount; ++blockIter) {
-                    MatrixBlock mask {_blocks[blockIter]};
-                    while (mask) {
-                        const size_t bitOffset {
-                            static_cast<size_t>(__builtin_ctzll(mask))
-                        };
-                        mask &= (mask - 1);
-                        const size_t col {blockIter * BitsPerBlock + bitOffset};
-                        if (col >= _colSize) {
-                            break;
-                        }
-                        fn(col);
-                    }
-                }
-            }
-        };
-
         bool row_parity(
             const MatrixBlock* rowBlocks,
             const std::vector<MatrixBlock>& bitBlocks,
@@ -120,36 +87,21 @@ namespace ATLab {
         const auto bitBlocks {bitset_to_blocks(authedBits._bits, blockCount)};
 
         for (size_t row {0}; row != matrix.rowSize; ++row) {
-            const MatrixBlock* rowBlocks {blockCount ? matrix.row_data(row) : nullptr};
-            const RowView rowView {rowBlocks, blockCount, matrix.colSize};
-            bool parity {false};
-            if (blockCount) {
-                parity = row_parity(rowBlocks, bitBlocks, blockCount);
-            }
-            emp::block rowMac {_mm_set_epi64x(0, 0)};
-            rowView.for_each_set_bit([&](const size_t colIndex) {
-                rowMac = _mm_xor_si128(rowMac, authedBits._macs[colIndex]);
-            });
-            bits[row] = parity;
-            macs[row] = rowMac;
+            const auto rowView {matrix.row(row)};
+            bits[row] = rowView.bitwise_inner_product(bitBlocks);
+            macs[row] = rowView * authedBits._macs;
         }
         return {std::move(bits), std::move(macs)};
     }
 
     ITMacBitKeys operator*(const Matrix<bool>& matrix, const ITMacBitKeys& keys) {
-        std::vector<emp::block> localKeys;
-        localKeys.reserve(matrix.rowSize);
-        const size_t blocksPerRow {matrix.blocks_per_row()};
+        std::vector<emp::block> newLocalKeys;
+        newLocalKeys.reserve(matrix.rowSize);
 
         for (size_t row {0}; row != matrix.rowSize; ++row) {
-            const MatrixBlock* rowBlocks {blocksPerRow ? matrix.row_data(row) : nullptr};
-            const RowView rowView {rowBlocks, blocksPerRow, matrix.colSize};
-            emp::block rowKey {_mm_set_epi64x(0, 0)};
-            rowView.for_each_set_bit([&](const size_t colIndex) {
-                rowKey = _mm_xor_si128(rowKey, keys._localKeys[colIndex]);
-            });
-            localKeys.push_back(rowKey);
+            const auto rowView {matrix.row(row)};
+            newLocalKeys.push_back(rowView * keys._localKeys);
         }
-        return {std::move(localKeys), keys._globalKeys};
+        return {std::move(newLocalKeys), keys._globalKeys};
     }
 }
