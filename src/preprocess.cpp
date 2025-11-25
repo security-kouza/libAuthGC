@@ -212,11 +212,11 @@ namespace {
                 masks[gate.out] = b[bIter];
                 macs[gate.out] = b.get_mac(0, bIter);
                 garblerMaskKeys[gate.out] = aMatrix.get_local_key(compressParam, aMatrixIter);
-                ++bIter;
-                ++aMatrixIter;
                 if (masks[gate.in0] && masks[gate.in1]) {
                     andedMasks.set(gate.in0, gate.in1, aMatrixIter - circuit.totalInputSize);
                 }
+                ++bIter;
+                ++aMatrixIter;
                 break;
 
             case Gate::Type::XOR:
@@ -231,6 +231,14 @@ namespace {
         }
 
         return {std::move(masks), std::move(macs), std::move(garblerMaskKeys), std::move(andedMasks)};
+    }
+
+    void xor_to(emp::block& a, const emp::block& b) {
+        a = _mm_xor_si128(a, b);
+    }
+
+    emp::block and_all_bits(bool a, const emp::block& b) {
+        return _mm_set1_epi64x(-static_cast<long long>(a)) & b;
     }
 }
 
@@ -262,7 +270,7 @@ namespace ATLab {
 
             // 5
             BlockCorrelatedOT::Receiver sid2 {io, 2};
-            const ITMacBits aHatMatrix {sid2, circuit.andGateSize};
+            const ITMacBits beaverTripleShares {sid2, circuit.andGateSize};
             const ITMacBlocks authedTmpDeltaStep5 {io, sid2, {tmpDelta}};
 
             // 6
@@ -274,28 +282,33 @@ namespace ATLab {
             const ITMacBitKeys evaluatorAndedMasks {io, globalKey.get_COT_sender(), circuit.andGateSize};
             const ITMacBits    authedAndedMasks {io, sid2, andedMasks.build_bitset(circuit.andGateSize)};
 
-            // 8
-            SparseStorage<emp::block> dualKeyAuthedProds(2 * circuit.andGateSize);
-            for (const auto& gate: circuit.gates) {
-                if (gate.type == Gate::Type::AND) {
-                    const Wire i {gate.in0}, j {gate.in1};
-                    std::vector<emp::block>
-                        compressedVector_ij(compressParam, macs.at(i)),
-                        compressedVector_ji(compressParam, macs.at(j));
-                    if (masks.at(i)) {
-                        for (size_t k {0}; k != compressParam; ++k) {
-                            compressedVector_ij[k] =
-                                _mm_xor_si128(compressedVector_ij[k], bStarKeys.get_local_key(0, k));
-                        }
-                    }
-                    if (masks.at(j)) {
-                        for (size_t k {0}; k != compressParam; ++k) {
-                            compressedVector_ji[k] =
-                                _mm_xor_si128(compressedVector_ji[k], bStarKeys.get_local_key(0, k));
-                        }
-                    }
-                }
-            }
+BENCHMARK_INIT
+BENCHMARK_START
+            // 8, 9
+            // Bitset tmpBeaverTripleLsb(circuit.andGateSize);
+            // for (size_t gateIter {0}, andGateIndex {0}; gateIter != circuit.gateSize; ++gateIter) {
+            //     const auto& gate {circuit.gates[gateIter]};
+            //     if (gate.type != Gate::Type::AND) {
+            //         continue;
+            //     }
+            //     // AND gate
+            //
+            //     // <a_i a_j> ^ <a_i b_j> ^ <a_j b_i> ^ <beaver triple share>
+            //     emp::block tmpBeaverTriple {_mm_xor_si128(macs[gate.in0], macs[gate.in1])};
+            //     xor_to(tmpBeaverTriple, authedAndedMasks.get_mac(0, andGateIndex));
+            //     xor_to(tmpBeaverTriple, beaverTripleShares.get_mac(0, andGateIndex));
+            //     xor_to(tmpBeaverTriple,
+            //         and_all_bits(authedAndedMasks[andGateIndex] ^ beaverTripleShares[andGateIndex], globalKey.get_alpha_0())
+            //     );
+            //     xor_to(tmpBeaverTriple, and_all_bits(masks[gate.in0], evaluatorMaskKeys[gate.in1]));
+            //     xor_to(tmpBeaverTriple, and_all_bits(masks[gate.in1], evaluatorMaskKeys[gate.in0]));
+            //
+            //     tmpBeaverTripleLsb.set(andGateIndex, get_LSB(tmpBeaverTriple));
+            //
+            //     ++andGateIndex;
+            // }
+
+BENCHMARK_END(G step 8);
 
             return {std::move(matrix), std::move(bKeys)};
         }
@@ -311,9 +324,11 @@ BENCHMARK_INIT;
 
             auto matrix {gen_and_send_matrix(io, n, compressParam)};
 
+BENCHMARK_START;
             // 2
             const ITMacBits bStar {globalKey.get_COT_receiver(), compressParam};
             auto b {matrix * bStar};
+BENCHMARK_END(E matrix multiplication);
 
             // 3
 BENCHMARK_START;
@@ -338,7 +353,7 @@ BENCHMARK_END(E step 4); // Bottleneck
 BENCHMARK_START
             // 5
             BlockCorrelatedOT::Sender sid2 {io, {globalKey.get_beta_0(), globalKey.get_delta()}};
-            ITMacBitKeys aHatMatrix {sid2, circuit.andGateSize};
+            ITMacBitKeys beaverTripleKeys {sid2, circuit.andGateSize}; // keys to garbler's beaver triple shares
             ITMacBlockKeys tmpDeltaStep5 {io, sid2, 1};
 BENCHMARK_END(E step 5);
 
