@@ -66,6 +66,18 @@ namespace ATLab {
     // Little Endian
     emp::block Block(const std::bitset<128>&);
 
+    inline size_t calc_bitset_block(const size_t bits) {
+        constexpr size_t bitsPerBlock {Bitset::bits_per_block};
+        return bits / bitsPerBlock + static_cast<size_t>(bits % bitsPerBlock != 0);
+    }
+
+    inline std::vector<BitsetBlock> dump_raw_blocks(const Bitset& bitset) {
+        std::vector<BitsetBlock> res;
+        res.reserve(calc_bitset_block(bitset.size()));
+        boost::to_block_range(bitset, std::back_inserter(res));
+        return res;
+    }
+
     // Little Endian
     Bitset to_bool_vector(const emp::block&);
 
@@ -80,9 +92,6 @@ namespace ATLab {
         const auto hi {static_cast<uint64_t>(_mm_extract_epi64(b, 1))};
         return (static_cast<__uint128_t>(hi) << 64) | lo;
     }
-
-    // const emp::block& as_block(const __uint128_t&);
-    // const __uint128_t& as_uint128(const emp::block&);
 
     namespace detail {
         inline emp::block gf_mul_block(const emp::block& lhs, const emp::block& rhs) {
