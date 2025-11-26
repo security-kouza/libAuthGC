@@ -30,6 +30,7 @@ namespace ATLab {
 		XORSourceList& operator=(const XORSourceList& other) = default;
 		XORSourceList& operator=(XORSourceList&& other) noexcept = default;
 
+		// Sequential
 		template <typename Callback>
 		void for_each_wire(Callback&& callback) const {
 			for (auto pos {_sources.find_first()}; pos != Bitset::npos; pos = _sources.find_next(pos)) {
@@ -88,6 +89,7 @@ namespace ATLab {
 	class Circuit {
 		std::vector<size_t> _andGateOrder;
 		std::vector<std::unique_ptr<XORSourceList>> _pXORSourceListVec;
+		std::unordered_map<Wire, size_t> _outputWireToGateIndex;
 	public:
 		static constexpr size_t AND_ORDER_DISABLED {std::numeric_limits<size_t>::max()};
 
@@ -103,6 +105,24 @@ namespace ATLab {
 		[[nodiscard]]
 		const XORSourceList& xor_source_list(const Wire wire) const {
 			return *_pXORSourceListVec[wire];
+		}
+
+		[[nodiscard]]
+		size_t gate_index_by_output_wire(const Wire outputWire) const {
+			const auto it {_outputWireToGateIndex.find(outputWire)};
+#ifdef DEBUG
+			if (it == _outputWireToGateIndex.cend()) {
+				std::ostringstream sout;
+				sout << "Output wire " << outputWire << " not found.\n";
+				throw std::out_of_range{sout.str()};
+			}
+#endif // DEBUG
+			return it->second;
+		}
+
+		[[nodiscard]]
+		size_t and_gate_order_by_output_wire(const Wire outputWire) const {
+			return and_gate_order(gate_index_by_output_wire(outputWire));
 		}
 	};
 }

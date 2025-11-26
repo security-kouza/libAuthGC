@@ -18,6 +18,7 @@ namespace ATLab {
 		gates.reserve(gateSize);
 		_andGateOrder.resize(gateSize, AND_ORDER_DISABLED);
 		_pXORSourceListVec.resize(wireSize);
+		_outputWireToGateIndex.reserve(gateSize);
 
 		fin >> inputSize0 >> inputSize1 >> outputSize;
 		totalInputSize = inputSize0 + inputSize1;
@@ -61,6 +62,7 @@ namespace ATLab {
 		for (size_t gateIter {0}; gateIter != gates.size(); ++gateIter) {
 			auto& gate {gates[gateIter]};
 
+			_outputWireToGateIndex[gate.out] = gateIter;
 			const auto outWire {static_cast<size_t>(gate.out)};
 
 			switch (gate.type) {

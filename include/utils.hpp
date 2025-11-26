@@ -66,11 +66,13 @@ namespace ATLab {
     // Little Endian
     emp::block Block(const std::bitset<128>&);
 
+    [[nodiscard]]
     inline size_t calc_bitset_block(const size_t bits) {
         constexpr size_t bitsPerBlock {Bitset::bits_per_block};
         return bits / bitsPerBlock + static_cast<size_t>(bits % bitsPerBlock != 0);
     }
 
+    [[nodiscard]]
     inline std::vector<BitsetBlock> dump_raw_blocks(const Bitset& bitset) {
         std::vector<BitsetBlock> res;
         res.reserve(calc_bitset_block(bitset.size()));
