@@ -1,23 +1,71 @@
 #ifndef ATLab_CIRCUIT_PARSER_HPP
 #define ATLab_CIRCUIT_PARSER_HPP
 
-#include <cstdint>
-#include <fstream>
 #include <limits>
 #include <string>
 #include <vector>
 
+#include "utils.hpp"
+
 namespace ATLab {
 	using Wire = int32_t;
 
+	class Circuit;
+
+	class XORSourceList {
+		Bitset _sources;
+		friend class Circuit;
+
+	public:
+		XORSourceList() = default;
+
+		XORSourceList(const size_t wireSize, const size_t wireIndex):
+			_sources {wireSize}
+		{
+			_sources.set(wireIndex);
+		}
+
+		XORSourceList(const XORSourceList& other) = default;
+		XORSourceList(XORSourceList&& other) noexcept = default;
+		XORSourceList& operator=(const XORSourceList& other) = default;
+		XORSourceList& operator=(XORSourceList&& other) noexcept = default;
+
+		template <typename Callback>
+		void for_each_wire(Callback&& callback) const {
+			for (auto pos {_sources.find_first()}; pos != Bitset::npos; pos = _sources.find_next(pos)) {
+				callback(static_cast<Wire>(pos));
+			}
+		}
+
+		[[nodiscard]] bool empty() const noexcept {
+			return _sources.none();
+		}
+
+		[[nodiscard]] size_t size() const noexcept {
+			return _sources.size();
+		}
+
+		XORSourceList& operator^=(const XORSourceList& other) {
+			_sources ^= other._sources;
+			return *this;
+		}
+
+		friend XORSourceList operator^(XORSourceList lhs, const XORSourceList& rhs) {
+			lhs ^= rhs;
+			return lhs;
+		}
+	};
+
 	struct Gate {
 		static constexpr Wire DISABLED {-1};
-		const enum class Type {
+
+		enum class Type {
 			AND, XOR, NOT
-		} type;
+		};
+
+		const Type type;
 		const Wire in0, in1, out;
 
-		// Ctor for XOR, AND
 		Gate(const char typeInitLetter, const Wire inFirst, const Wire inSecond, const Wire output):
 			type {(typeInitLetter == 'A') ? Type::AND : Type::XOR},
 			in0 {inFirst},
@@ -25,59 +73,36 @@ namespace ATLab {
 			out {output}
 		{}
 
-		// Ctor for NOT
 		Gate(const Wire input, const Wire output):
 			type {Type::NOT},
 			in0 {input},
 			in1 {DISABLED},
 			out {output}
 		{}
+
+		[[nodiscard]] bool is_and() const noexcept {
+			return type == Type::AND;
+		}
 	};
 
-	struct Circuit {
-		size_t gateSize, wireSize, inputSize0, inputSize1, totalInputSize, outputSize;
-		size_t andGateSize;
+	class Circuit {
+		std::vector<size_t> _andGateOrder;
+		std::vector<std::unique_ptr<XORSourceList>> _pXORSourceListVec;
+	public:
+		static constexpr size_t AND_ORDER_DISABLED {std::numeric_limits<size_t>::max()};
+
+		size_t gateSize {}, wireSize {}, inputSize0 {}, inputSize1 {}, totalInputSize {}, outputSize {};
+		size_t andGateSize {};
 		std::vector<Gate> gates;
-		explicit Circuit(const std::string& filename):
-			andGateSize {0}
-		{
-			std::ifstream fin {filename};
-			if (!fin) {
-				throw std::runtime_error("Cannot open file " + filename);
-			}
 
-			fin >> gateSize >> wireSize;
-			gates.reserve(gateSize);
+		explicit Circuit(const std::string& filename);
 
-			fin >> inputSize0 >> inputSize1 >> outputSize;
-			totalInputSize = inputSize0 + inputSize1;
-			fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		[[nodiscard]]
+		size_t and_gate_order(size_t gateIndex) const;
 
-			for (size_t i {0}; i != gateSize; ++i) {
-				if (fin.get() == '2') {
-					// XOR or AND
-					fin.ignore(3); // ignores " 1 "
-					Wire in0, in1, out;
-					fin >> in0 >> in1 >> out;
-
-					char gateInitLetter;
-					fin >> gateInitLetter;
-					fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-					if (gateInitLetter == 'A') {
-						++andGateSize;
-					}
-					gates.emplace_back(gateInitLetter, in0, in1, out);
-				} else {
-					// INV, i.e., NOT
-					fin.ignore(3); // ignores " 1 "
-					Wire in, out;
-					fin >> in >> out;
-					fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-					gates.emplace_back(in, out);
-				}
-			}
+		[[nodiscard]]
+		const XORSourceList& xor_source_list(const Wire wire) const {
+			return *_pXORSourceListVec[wire];
 		}
 	};
 }

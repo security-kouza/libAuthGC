@@ -47,6 +47,7 @@ set(SRC
     src/authed_bit.cpp
     src/preprocess.cpp
     src/matrix.cpp
+    src/circuit.cpp
 )
 set(HEADER
     include/socket.hpp
@@ -98,6 +99,11 @@ if (ENABLE_TEST)
         ${TEST_NAME}
         ${PROJECT_NAME}
         gtest_main
+    )
+
+    file(
+        COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests/circuits/
+        DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/circuits
     )
 
     include(GoogleTest)

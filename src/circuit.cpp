@@ -1,0 +1,104 @@
+#include <circuit_parser.hpp>
+
+#include <sstream>
+#include <fstream>
+#include <limits>
+#include <stdexcept>
+
+namespace ATLab {
+	Circuit::Circuit(const std::string& filename):
+		andGateSize {0}
+	{
+		std::ifstream fin {filename};
+		if (!fin) {
+			throw std::runtime_error{"Cannot open file " + filename};
+		}
+
+		fin >> gateSize >> wireSize;
+		gates.reserve(gateSize);
+		_andGateOrder.resize(gateSize, AND_ORDER_DISABLED);
+		_pXORSourceListVec.resize(wireSize);
+
+		fin >> inputSize0 >> inputSize1 >> outputSize;
+		totalInputSize = inputSize0 + inputSize1;
+		if (wireSize < totalInputSize) {
+			throw std::runtime_error{"Circuit declares more inputs than wires"};
+		}
+		fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+		for (size_t i {0}; i != gateSize; ++i) {
+			char inputWireSize;
+			fin >> inputWireSize;
+			fin.ignore(3);
+			if (inputWireSize == '2') {
+				// AND or XOR gates
+				Wire in0, in1, out;
+				fin >> in0 >> in1 >> out;
+
+				char gateInitLetter;
+				fin >> gateInitLetter;
+				fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+				if (gateInitLetter == 'A') {
+					++andGateSize;
+				}
+				gates.emplace_back(gateInitLetter, in0, in1, out);
+			} else {
+				// NOT gates
+				Wire in, out;
+				fin >> in >> out;
+				fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+				gates.emplace_back(in, out);
+			}
+		}
+
+		for (size_t wireIndex {0}; wireIndex != totalInputSize; ++wireIndex) {
+			_pXORSourceListVec[wireIndex] = std::make_unique<XORSourceList>(wireSize, wireIndex);
+		}
+
+		size_t currentAndOrder {0};
+		for (size_t gateIter {0}; gateIter != gates.size(); ++gateIter) {
+			auto& gate {gates[gateIter]};
+
+			const auto outWire {static_cast<size_t>(gate.out)};
+
+			switch (gate.type) {
+				case Gate::Type::XOR: {
+					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(
+						*_pXORSourceListVec[gate.in0] ^ *_pXORSourceListVec[gate.in1]
+					);
+					break;
+				}
+				case Gate::Type::AND: {
+					_andGateOrder[gateIter] = currentAndOrder;
+					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(wireSize, outWire);
+					++currentAndOrder;
+					break;
+				}
+				case Gate::Type::NOT: {
+					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(*_pXORSourceListVec[gate.in0]);
+					break;
+				}
+			}
+		}
+	}
+
+	size_t Circuit::and_gate_order(const size_t gateIndex) const {
+#ifdef DEBUG
+		if (gateIndex >= _andGateOrder.size()) {
+			std::ostringstream sout;
+			sout << "Accessing gate index " << gateIndex << ", but only " << gateSize << " gates exist.\n";
+			throw std::out_of_range{sout.str()};
+		}
+		if (gates[gateIndex].type != Gate::Type::AND) {
+			const std::string gateType {gates[gateIndex].type == Gate::Type::XOR ? "an XOR" : "a NOT"};
+			std::ostringstream sout;
+			sout << "Gate " << gateIndex << " is not an AND gate, but " << gateType << " Gate.\n";
+			throw std::runtime_error{sout.str()};
+		}
+#endif // DEBUG
+		const auto andGateOrder {_andGateOrder[gateIndex]};
+		return andGateOrder;
+	}
+}
