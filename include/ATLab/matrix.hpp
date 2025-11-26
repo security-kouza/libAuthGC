@@ -226,9 +226,11 @@ namespace ATLab {
         return Matrix<bool>::Total_block_count(rows, cols);
     }
 
-    inline void zero_matrix_row_padding(std::vector<Matrix<bool>::Block64>& blocks,
-                                        const size_t rows,
-                                        const size_t cols) {
+    inline void zero_matrix_row_padding(
+        std::vector<Matrix<bool>::Block64>& blocks,
+        const size_t rows,
+        const size_t cols
+    ) {
         const size_t blockPerRow {Matrix<bool>::Blocks_per_row(cols)};
         if (!blockPerRow) {
             return;
@@ -241,6 +243,17 @@ namespace ATLab {
         for (size_t row {0}; row < rows; ++row) {
             blocks[row * blockPerRow + (blockPerRow - 1)] &= mask;
         }
+    }
+
+    inline std::vector<emp::block> operator*(const Matrix<bool>& matrix, const std::vector<emp::block>& vector) {
+        std::vector<emp::block> res;
+        res.reserve(matrix.rowSize);
+
+        for (size_t row {0}; row != matrix.rowSize; ++row) {
+            res.emplace_back(matrix.row(row) * vector);
+        }
+
+        return res;
     }
 }
 

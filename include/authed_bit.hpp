@@ -54,6 +54,10 @@ namespace ATLab {
             return _macs.at(globalKeyPos * size() + blockPos);
         }
 
+        const std::vector<emp::block>& get_all_macs() const {
+            return _macs;
+        }
+
         // block ^= 1, macs unchanged
         void flip_block_lsb(const size_t blockPos = 0) {
             _blocks.at(blockPos) = _mm_xor_si128(_blocks.at(blockPos), _mm_set_epi64x(0, 1));
@@ -62,6 +66,8 @@ namespace ATLab {
         std::vector<emp::block> release_macs() && {
             return std::move(_macs);
         }
+
+        friend ITMacBlocks operator*(const Matrix<bool>&, const ITMacBlocks&);
     };
 
     class ITMacScaledBits {
@@ -105,6 +111,13 @@ namespace ATLab {
     class ITMacBlockKeys {
         std::vector<emp::block> _localKeys; // flattened by global key then block index
         std::vector<emp::block> _globalKeys;
+
+        // Move localkeys only when globalKey with size 1
+        // private constructor, only used by the friend matrix multiplication
+        ITMacBlockKeys(std::vector<emp::block>&& localKeys, const emp::block globalKey):
+            _localKeys {std::move(localKeys)},
+            _globalKeys {globalKey}
+        {}
     public:
         ITMacBlockKeys(const std::vector<emp::block>& localKeys, std::vector<emp::block> globalKeys):
             _globalKeys {std::move(globalKeys)}
@@ -165,6 +178,8 @@ namespace ATLab {
                     _mm_xor_si128(_localKeys.at(i * blockSize + blockPos), _globalKeys.at(i));
             }
         }
+
+        friend ITMacBlockKeys operator*(const Matrix<bool>&, const ITMacBlockKeys&);
     };
 
     class ITMacBits {

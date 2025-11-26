@@ -104,4 +104,54 @@ namespace ATLab {
         }
         return {std::move(newLocalKeys), keys._globalKeys};
     }
+
+    ITMacBlocks operator*(const Matrix<bool>& matrix, const ITMacBlocks& blocks) {
+        constexpr size_t GLOBAL_KEY_SIZE {1}; // Only allowing one global key
+#ifdef DEBUG
+        if (blocks.global_key_size() != GLOBAL_KEY_SIZE) {
+            std::ostringstream sout;
+            sout << "blocks has " << blocks.global_key_size() << " global keys. Only accepting 1.\n";
+            throw std::invalid_argument{sout.str()};
+        }
+        if (matrix.colSize != blocks.size()) {
+            std::ostringstream sout;
+            sout << "Sizes mismatch: matrix columns " << matrix.colSize
+                << ", blocks " << blocks.size() << "\n";
+            throw std::invalid_argument{sout.str()};
+        }
+#endif // DEBUG
+        std::vector<emp::block> newBlocks, newMacs;
+        newBlocks.reserve(matrix.rowSize);
+        newMacs.reserve(matrix.rowSize);
+        for (size_t row {0}; row != matrix.rowSize; ++row) {
+            const auto rowView {matrix.row(row)};
+             newBlocks.emplace_back(rowView * blocks._blocks);
+             newMacs.emplace_back(rowView * blocks._macs);
+        }
+        return {std::move(newBlocks), std::move(newMacs), GLOBAL_KEY_SIZE};
+    }
+
+    ITMacBlockKeys operator*(const Matrix<bool>& matrix, const ITMacBlockKeys& keys) {
+        constexpr size_t GLOBAL_KEY_SIZE {1}; // Only allowing one global key
+#ifdef DEBUG
+        if (keys.global_key_size() != GLOBAL_KEY_SIZE) {
+            std::ostringstream sout;
+            sout << "`keys` has " << keys.global_key_size() << " global keys. Only accepting 1.\n";
+            throw std::invalid_argument{sout.str()};
+        }
+        if (matrix.colSize != keys.size()) {
+            std::ostringstream sout;
+            sout << "Sizes mismatch: matrix columns " << matrix.colSize
+                << ", `keys` " << keys.size() << "\n";
+            throw std::invalid_argument{sout.str()};
+        }
+#endif // DEBUG
+        std::vector<emp::block> newLocalKeys;
+        newLocalKeys.reserve(matrix.rowSize);
+        for (size_t row {0}; row != matrix.rowSize; ++row) {
+            const auto rowView {matrix.row(row)};
+            newLocalKeys.emplace_back(rowView * keys._localKeys);
+        }
+        return {std::move(newLocalKeys), keys._globalKeys.front()};
+    }
 }

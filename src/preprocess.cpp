@@ -307,6 +307,28 @@ BENCHMARK_START
             //
             //     ++andGateIndex;
             // }
+            // 8
+            auto dualAuthedB {matrix * dualAuthedBStar};
+            // 9
+            Bitset tmpBeaverTripleLsb(circuit.andGateSize);
+            for (size_t gateIter {0}, andGateIndex {0}; gateIter != circuit.gateSize; ++gateIter) {
+                const auto& gate {circuit.gates[gateIter]};
+                if (!gate.is_and()) {
+                    continue;
+                }
+                // AND gate
+
+                // <a_i a_j> ^ <a_i b_j> ^ <a_j b_i> ^ <beaver triple share>
+                emp::block tmpBeaverTriple {_mm_set_epi64x(0, 0)};
+                xor_to(tmpBeaverTriple, authedAndedMasks.get_mac(0, andGateIndex));
+                xor_to(tmpBeaverTriple, beaverTripleShares.get_mac(0, andGateIndex));
+                xor_to(tmpBeaverTriple,
+                    and_all_bits(authedAndedMasks[andGateIndex] ^ beaverTripleShares[andGateIndex], globalKey.get_alpha_0())
+                );
+
+                tmpBeaverTripleLsb.set(andGateIndex, get_LSB(tmpBeaverTriple));
+                ++andGateIndex;
+            }
 
 BENCHMARK_END(G step 8);
 
@@ -342,7 +364,7 @@ BENCHMARK_END(E step 3);
 
 BENCHMARK_START;
             // 4
-            std::vector<emp::block> sid1Keys {std::move(dualAuthedBStar).release_macs()};
+            std::vector<emp::block> sid1Keys {dualAuthedBStar.get_all_macs()};
             sid1Keys.push_back(globalKey.get_delta());
             BlockCorrelatedOT::Sender sid1 {io, std::move(sid1Keys)};
             const ITMacBitKeys aMatrix {sid1, m};
@@ -370,7 +392,10 @@ BENCHMARK_START
             };
             const ITMacBitKeys garblerAndedMasks {io, sid2, circuit.andGateSize};
 BENCHMARK_END(E step 7);
-
+BENCHMARK_START
+            // 8
+            const auto dualAuthedB {matrix * dualAuthedBStar};
+BENCHMARK_END(E step 8);
             return {std::move(matrix), std::move(b)};
         }
     }
