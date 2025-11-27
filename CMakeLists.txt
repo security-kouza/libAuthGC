@@ -48,6 +48,7 @@ set(SRC
     src/preprocess.cpp
     src/matrix.cpp
     src/circuit.cpp
+    src/garble_evaluate.cpp
 )
 set(HEADER
     include/socket.hpp
@@ -62,6 +63,7 @@ set(HEADER
     include/circuit_parser.hpp
     include/ATLab/preprocess.hpp
     include/ATLab/matrix.hpp
+    include/ATLab/garble_evaluate.hpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})

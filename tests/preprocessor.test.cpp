@@ -9,9 +9,9 @@
 #include "test-helper.hpp"
 
 TEST(Preprocess, DEFAULT) {
-    // const auto circuit {ATLab::Circuit("circuits/bristol_format/adder_32bit.txt")};
+    const auto circuit {ATLab::Circuit("circuits/bristol_format/adder_32bit.txt")};
     // const auto circuit {ATLab::Circuit("test/ands.txt")};
-    const auto circuit {ATLab::Circuit("circuits/bristol_format/AES-non-expanded.txt")};
+    // const auto circuit {ATLab::Circuit("circuits/bristol_format/AES-non-expanded.txt")};
     std::unique_ptr<ATLab::Garbler::PreprocessedData> pGarblerPreData;
     std::unique_ptr<ATLab::Evaluator::PreprocessedData> pEvaluatorPreData;
 
