@@ -16,10 +16,11 @@ namespace ATLab {
     namespace Garbler {
         struct GarbledCircuit {
             std::vector<emp::block> label0, label1;
-            std::vector<std::array<emp::block, 2>> garbledTables;
+            GarbledTableVec garbledTables;
             Bitset wireMaskShift;
         };
         GarbledCircuit garble(
+            emp::NetIO&         io,
             const Circuit&      circuit,
             const emp::block&   globalKey,
             const ITMacBits&    masks,
@@ -30,19 +31,27 @@ namespace ATLab {
     }
 
     namespace Evaluator {
+
+        struct ReceivedGarbledCircuit {
+            GarbledTableVec garbledTables;
+            Bitset wireMaskShift;
+        };
+
+        ReceivedGarbledCircuit garble(emp::NetIO& io, const Circuit& circuit);
+
         struct EvaluateResult {
             Bitset maskedValues;
             std::vector<emp::block> labels;
         };
 
         EvaluateResult evaluate(
-            const Circuit&          circuit,
-            const GarbledTableVec&  garbledTables,
-            const ITMacBits&        masks,
-            const ITMacBits&        beaverTriples,
-            Bitset                  maskedValues,
-            std::vector<emp::block> labels,
-            const Bitset&           wireMaskShift
+            emp::NetIO&                     io,
+            const Circuit&                  circuit,
+            const ITMacBits&                masks,
+            const ITMacBits&                beaverTriples,
+            const ReceivedGarbledCircuit&   garbledCircuit,
+            Bitset                          maskedValues,
+            std::vector<emp::block>         labels
         );
     }
 }

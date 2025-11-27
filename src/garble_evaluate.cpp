@@ -3,6 +3,7 @@
 namespace ATLab {
     namespace Garbler {
         GarbledCircuit garble(
+            emp::NetIO&         io,
             const Circuit&      circuit,
             const emp::block&   globalKey,
             const ITMacBits&    masks,
@@ -75,20 +76,39 @@ namespace ATLab {
                 }
             }
 
+            io.send_data(garbledTables.data(), garbledTables.size() * 2 * sizeof(emp::block));
+            const auto rawWireMaskShift {dump_raw_blocks(wireMaskShift)};
+            io.send_data(rawWireMaskShift.data(), rawWireMaskShift.size() * sizeof(BitsetBlock));
+
             return {std::move(label0), std::move(label1), std::move(garbledTables), std::move(wireMaskShift)};
         }
     }
 
     namespace Evaluator {
+        ReceivedGarbledCircuit garble(emp::NetIO& io, const Circuit& circuit) {
+            GarbledTableVec garbledTables(circuit.andGateSize, {zero_block(), zero_block()});
+
+            io.recv_data(garbledTables.data(), circuit.andGateSize * 2 * sizeof(emp::block));
+            std::vector<BitsetBlock> rawWireMaskShift(calc_bitset_block(circuit.andGateSize));
+            io.recv_data(rawWireMaskShift.data(), rawWireMaskShift.size() * sizeof(BitsetBlock));
+            Bitset wireMaskShift {rawWireMaskShift.begin(), rawWireMaskShift.end()};
+            wireMaskShift.resize(circuit.andGateSize);
+
+            return {std::move(garbledTables), std::move(wireMaskShift)};
+        }
+
         EvaluateResult evaluate(
-            const Circuit&          circuit,
-            const GarbledTableVec&  garbledTables,
-            const ITMacBits&        masks,
-            const ITMacBits&        beaverTriples,
-            Bitset                  maskedValues,
-            std::vector<emp::block> labels,
-            const Bitset&           wireMaskShift
+            emp::NetIO&                     io,
+            const Circuit&                  circuit,
+            const ITMacBits&                masks,
+            const ITMacBits&                beaverTriples,
+            const ReceivedGarbledCircuit&   garbledCircuit,
+            Bitset                          maskedValues,
+            std::vector<emp::block>         labels
         ) {
+            const auto& garbledTables {garbledCircuit.garbledTables};
+            const auto& wireMaskShift {garbledCircuit.wireMaskShift};
+
             maskedValues.resize(circuit.wireSize);
             labels.resize(circuit.wireSize);
             for (size_t gateIter {0}, andGateIter {0}; gateIter != circuit.gateSize; ++gateIter) {
