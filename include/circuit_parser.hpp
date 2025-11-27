@@ -10,8 +10,6 @@
 namespace ATLab {
 	using Wire = int32_t;
 
-	class Circuit;
-
 	class XORSourceList {
 		Bitset _sources;
 		friend class Circuit;
@@ -66,19 +64,22 @@ namespace ATLab {
 
 		const Type type;
 		const Wire in0, in1, out;
+		const size_t index;
 
-		Gate(const char typeInitLetter, const Wire inFirst, const Wire inSecond, const Wire output):
+		Gate(const char typeInitLetter, const Wire inFirst, const Wire inSecond, const Wire output, const size_t index):
 			type {(typeInitLetter == 'A') ? Type::AND : Type::XOR},
 			in0 {inFirst},
 			in1 {inSecond},
-			out {output}
+			out {output},
+			index {index}
 		{}
 
-		Gate(const Wire input, const Wire output):
+		Gate(const Wire input, const Wire output, const size_t index):
 			type {Type::NOT},
 			in0 {input},
 			in1 {DISABLED},
-			out {output}
+			out {output},
+			index {index}
 		{}
 
 		[[nodiscard]] bool is_and() const noexcept {
@@ -101,6 +102,11 @@ namespace ATLab {
 
 		[[nodiscard]]
 		size_t and_gate_order(size_t gateIndex) const;
+
+		[[nodiscard]]
+		size_t and_gate_order(const Gate& gate) const {
+			return and_gate_order(gate.index);
+		}
 
 		[[nodiscard]]
 		const XORSourceList& xor_source_list(const Wire wire) const {

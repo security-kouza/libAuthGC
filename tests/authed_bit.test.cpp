@@ -3,16 +3,15 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <type_traits>
+#include <map>
 
 #include <emp-tool/utils/block.h>
 #include <emp-tool/utils/f2k.h>
 #include <emp-tool/utils/utils.h>
 
 #include <authed_bit.hpp>
-
-
-const std::string ADDRESS {"127.0.0.1"};
-constexpr unsigned short PORT {12345};
+#include "test-helper.hpp"
 
 TEST(Authed_Bit, random_bits) {
     constexpr size_t deltaSize {3};
@@ -27,19 +26,17 @@ TEST(Authed_Bit, random_bits) {
     std::unique_ptr<ATLab::ITMacBitKeys> keys;
     std::unique_ptr<ATLab::ITMacBits> bits;
 
-    std::thread bCOTSenderThread{
-                    [&]() {
-                        emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
-                        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-                        keys = std::make_unique<ATLab::ITMacBitKeys>(sender, BitSize);
-                    }
-                }, bCOTReceiverThread{
-                    [&]() {
-                        emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
-                        ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
-                        bits = std::make_unique<ATLab::ITMacBits>(receiver, BitSize);
-                    }
-                };
+    std::thread bCOTSenderThread{[&]() {
+        auto& io {server_io()};
+        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+        keys = std::make_unique<ATLab::ITMacBitKeys>(sender, BitSize);
+        io.flush();
+    }}, bCOTReceiverThread{[&]() {
+        auto& io {client_io()};
+        ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
+        bits = std::make_unique<ATLab::ITMacBits>(receiver, BitSize);
+        io.flush();
+    }};
 
     bCOTSenderThread.join();
     bCOTReceiverThread.join();
@@ -53,15 +50,7 @@ TEST(Authed_Bit, random_bits) {
         ASSERT_EQ(ATLab::as_uint128(keys->get_global_key(i)), ATLab::as_uint128(deltaArr.at(i)));
     }
 
-    for (size_t i = 0; i < deltaSize; ++i) {
-        for (size_t j = 0; j < BitSize; ++j) {
-            emp::block expected = keys->get_local_key(i, j);
-            if (bits->at(j)) {
-                expected = expected ^ deltaArr.at(i);
-            }
-            EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits->get_mac(i, j)));
-        }
-    }
+    test_ITMacBits({{bits.get(), keys.get()}});
 }
 
 TEST(Authed_Bit, fixed_bits) {
@@ -80,19 +69,17 @@ TEST(Authed_Bit, fixed_bits) {
     std::unique_ptr<ATLab::ITMacBitKeys> keys;
     std::unique_ptr<ATLab::ITMacBits> bits;
 
-    std::thread bCOTSenderThread{
-        [&]() {
-            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
-            ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacBitKeys>(io, sender, BitSize);
-        }
-    }, bCOTReceiverThread{
-        [&]() {
-            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
-            ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
-            bits = std::make_unique<ATLab::ITMacBits>(io, receiver, bitsToFix);
-        }
-    };
+    std::thread bCOTSenderThread{[&]() {
+        auto& io {server_io()};
+        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+        keys = std::make_unique<ATLab::ITMacBitKeys>(io, sender, BitSize);
+        io.flush();
+    }}, bCOTReceiverThread{[&]() {
+        auto& io {client_io()};
+        ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
+        bits = std::make_unique<ATLab::ITMacBits>(io, receiver, bitsToFix);
+        io.flush();
+    }};
 
     bCOTSenderThread.join();
     bCOTReceiverThread.join();
@@ -110,15 +97,7 @@ TEST(Authed_Bit, fixed_bits) {
         ASSERT_EQ(ATLab::as_uint128(keys->get_global_key(i)), ATLab::as_uint128(deltaArr.at(i)));
     }
 
-    for (size_t i = 0; i < deltaSize; ++i) {
-        for (size_t j = 0; j < BitSize; ++j) {
-            emp::block expected = keys->get_local_key(i, j);
-            if (bits->at(j)) {
-                expected = expected ^ deltaArr.at(i);
-            }
-            EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits->get_mac(i, j)));
-        }
-    }
+    test_ITMacBits({{bits.get(), keys.get()}});
 }
 
 TEST(Authed_Bit, random_blocks) {
@@ -135,19 +114,17 @@ TEST(Authed_Bit, random_blocks) {
     std::unique_ptr<ATLab::ITMacBlockKeys> keys;
     std::unique_ptr<ATLab::ITMacBlocks> authedBlocks;
 
-    std::thread bCOTSenderThread{
-        [&]() {
-            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, BLOCK_PORT, true);
-            ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacBlockKeys>(sender, blockSize);
-        }
-    }, bCOTReceiverThread{
-        [&]() {
-            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, BLOCK_PORT, true);
-            ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
-            authedBlocks = std::make_unique<ATLab::ITMacBlocks>(receiver, blockSize);
-        }
-    };
+    std::thread bCOTSenderThread{[&]() {
+        auto& io {server_io()};
+        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+        keys = std::make_unique<ATLab::ITMacBlockKeys>(sender, blockSize);
+        io.flush();
+    }}, bCOTReceiverThread{[&]() {
+        auto& io {client_io()};
+        ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
+        authedBlocks = std::make_unique<ATLab::ITMacBlocks>(receiver, blockSize);
+        io.flush();
+    }};
 
     bCOTSenderThread.join();
     bCOTReceiverThread.join();
@@ -192,19 +169,17 @@ TEST(Authed_Bit, fixed_blocks) {
     std::unique_ptr<ATLab::ITMacBlockKeys> keys;
     std::unique_ptr<ATLab::ITMacBlocks> authedBlocks;
 
-    std::thread bCOTSenderThread{
-        [&]() {
-            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, LOCAL_PORT, true);
-            ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockSize);
-        }
-    }, bCOTReceiverThread{
-        [&, blocksToFix]() {
-            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, LOCAL_PORT, true);
-            ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
-            authedBlocks = std::make_unique<ATLab::ITMacBlocks>(io, receiver, blocksToFix);
-        }
-    };
+    std::thread bCOTSenderThread{[&]() {
+        auto& io {server_io()};
+        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+        keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockSize);
+        io.flush();
+    }}, bCOTReceiverThread{[&, blocksToFix]() {
+        auto& io {client_io()};
+        ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
+        authedBlocks = std::make_unique<ATLab::ITMacBlocks>(io, receiver, blocksToFix);
+        io.flush();
+    }};
 
     bCOTSenderThread.join();
     bCOTReceiverThread.join();
@@ -257,19 +232,17 @@ TEST(Authed_Bit, fixed_blocks_scalar_bitset) {
     std::unique_ptr<ATLab::ITMacBlockKeys> keys;
     std::unique_ptr<ATLab::ITMacScaledBits> authedBlocks;
 
-    std::thread bCOTSenderThread{
-        [&]() {
-            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, LOCAL_PORT, true);
-            ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
-            keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockSize);
-        }
-    }, bCOTReceiverThread{
-        [&, blockSelectors]() {
-            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, LOCAL_PORT, true);
-            ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
-            authedBlocks = std::make_unique<ATLab::ITMacScaledBits>(io, receiver, scalarBlock, blockSelectors);
-        }
-    };
+    std::thread bCOTSenderThread{[&]() {
+        auto& io {server_io()};
+        ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+        keys = std::make_unique<ATLab::ITMacBlockKeys>(io, sender, blockSize);
+        io.flush();
+    }}, bCOTReceiverThread{[&, blockSelectors]() {
+        auto& io {client_io()};
+        ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
+        authedBlocks = std::make_unique<ATLab::ITMacScaledBits>(io, receiver, scalarBlock, blockSelectors);
+        io.flush();
+    }};
 
     bCOTSenderThread.join();
     bCOTReceiverThread.join();

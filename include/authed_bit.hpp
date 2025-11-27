@@ -259,6 +259,10 @@ namespace ATLab {
             return _macs.at(bitPos + globalKeyPos * size());
         }
 
+        const Bitset& bits() const {
+            return _bits;
+        }
+
         ITMacBlocks polyval_to_Blocks() && {
             const size_t GLOBAL_KEY_SIZE {global_key_size()};
             return ITMacBlocks{_bits, std::move(_macs), GLOBAL_KEY_SIZE};

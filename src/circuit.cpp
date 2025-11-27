@@ -43,14 +43,14 @@ namespace ATLab {
 				if (gateInitLetter == 'A') {
 					++andGateSize;
 				}
-				gates.emplace_back(gateInitLetter, in0, in1, out);
+				gates.emplace_back(gateInitLetter, in0, in1, out, i);
 			} else {
 				// NOT gates
 				Wire in, out;
 				fin >> in >> out;
 				fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-				gates.emplace_back(in, out);
+				gates.emplace_back(in, out, i);
 			}
 		}
 
