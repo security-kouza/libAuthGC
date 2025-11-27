@@ -79,6 +79,14 @@ namespace ATLab {
 #endif // DEBUG
         }
 
+        Matrix(const size_t rows, const size_t cols):
+            rowSize {rows},
+            colSize {cols},
+            data {Total_block_count(rows, cols), 0}
+        {
+            // already zero matrix, no need to call zero_matrix_row_padding
+        }
+
         static constexpr size_t Blocks_per_row(const size_t cols) {
             return cols ? ((cols + bits_per_block - 1) / bits_per_block) : 0;
         }

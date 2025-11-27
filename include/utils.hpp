@@ -129,6 +129,18 @@ namespace ATLab {
         // Fast when the __V is already in a XMM register.
         return _mm_testz_si128(x, _mm_cvtsi32_si128(1)) == 0;
     }
+
+    inline void xor_to(emp::block& a, const emp::block& b) {
+        a = _mm_xor_si128(a, b);
+    }
+
+    inline emp::block and_all_bits(const bool bit, const emp::block& block) {
+        return _mm_set1_epi64x(-static_cast<long long>(bit)) & block;
+    }
+
+    inline emp::block zero_block() {
+        return _mm_set_epi64x(0, 0);
+    }
 }
 
 #endif // REVELIO_UTILS

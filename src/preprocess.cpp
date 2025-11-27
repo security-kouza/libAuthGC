@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <algorithm>
 #include <utility>
-#include <boost/core/span.hpp>
 
 #include <ATLab/benchmark.hpp>
 #include "global_key_sampling.hpp"
@@ -70,21 +69,29 @@ namespace {
             return _map.at(pack(i, j));
         }
 
+        const T& at(const typename decltype(_map)::iterator& it) {
+            return _map.at(it->second);
+        }
+
         const auto& end() {
             return _map.end();
+        }
+
+        auto try_emplace(const uint32_t i, const uint32_t j, T val = T{}) {
+            return _map.try_emplace(pack(i, j), val);
         }
 
         const auto& find(const uint32_t i, const uint32_t j) {
             return _map.find(pack(i, j));
         }
 
-        T release(const typename std::unordered_map<unsigned long, T>::iterator& it) {
+        T release(const typename decltype(_map)::iterator& it) {
             return std::move(_map.extract(it).mapped());
         }
     };
 
     Matrix<bool> get_matrix(emp::NetIO& io, const size_t n, const size_t L) {
-        const size_t blockSize {calc_matrix_blockSize(n, L)};
+        const size_t blockSize {calc_matrix_blockSize(n, L)}; // TODO: Change to Total_block_count
         std::vector<MatrixBlock> rawData(blockSize);
         io.recv_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
         return {n, L, std::move(rawData)};
@@ -100,9 +107,8 @@ namespace {
     }
 
     struct PopulatedWireMasks {
-        Bitset masks;
-        std::vector<emp::block> macs;
-        std::vector<emp::block> keys; // of the opponent's masks
+        ITMacBits masks;
+        ITMacBitKeys keys; // of the opponent's masks
         SparseBitMatrix andedMasks;
     };
 
@@ -167,7 +173,11 @@ namespace {
             }
         }
 
-        return {std::move(masks), std::move(macs), std::move(evaluatorMaskKeys), std::move(andedMasks)};
+        return {
+            ITMacBits{std::move(masks), std::move(macs)},
+            ITMacBitKeys{std::move(evaluatorMaskKeys), {bKeys.get_global_key(0)}},
+            std::move(andedMasks)
+        };
     }
 
     PopulatedWireMasks populate_wires_evaluator(
@@ -230,28 +240,27 @@ namespace {
             }
         }
 
-        return {std::move(masks), std::move(macs), std::move(garblerMaskKeys), std::move(andedMasks)};
-    }
-
-    void xor_to(emp::block& a, const emp::block& b) {
-        a = _mm_xor_si128(a, b);
-    }
-
-    emp::block and_all_bits(bool a, const emp::block& b) {
-        return _mm_set1_epi64x(-static_cast<long long>(a)) & b;
+        return {
+            ITMacBits{std::move(masks), std::move(macs)},
+            ITMacBitKeys{std::move(garblerMaskKeys), {aMatrix.get_global_key(compressParam)}},
+            std::move(andedMasks)
+        };
     }
 }
 
 namespace ATLab {
+
+    // TODO: Separate circuit-independent and -dependent phases into two functions
+
     namespace Garbler {
         PreprocessedData preprocess(emp::NetIO& io, const Circuit& circuit) {
             const GlobalKeySampling::Garbler globalKey {io};
 
-            const auto n {circuit.andGateSize + circuit.inputSize1};
-            const auto compressParam {static_cast<size_t>(calc_compression_parameter(n))};
-            const auto m {n + circuit.inputSize0};
+            const size_t evaluatorIndependentWireSize {circuit.andGateSize + circuit.inputSize1};
+            const auto compressParam {static_cast<size_t>(calc_compression_parameter(evaluatorIndependentWireSize))};
+            const auto independentWireSize {evaluatorIndependentWireSize + circuit.inputSize0};
 
-            auto matrix {get_matrix(io, n, compressParam)};
+            auto matrix {get_matrix(io, evaluatorIndependentWireSize, compressParam)};
 
             // 2
             const ITMacBitKeys bStarKeys {globalKey.get_COT_sender(), compressParam};
@@ -262,7 +271,7 @@ namespace ATLab {
 
             // 4
             BlockCorrelatedOT::Receiver sid1 {io, compressParam + 1};
-            const ITMacBits aMatrix {sid1, m};
+            const ITMacBits aMatrix {sid1, independentWireSize};
 
             emp::block tmpDelta;
             THE_GLOBAL_PRNG.random_block(&tmpDelta, 1);
@@ -270,13 +279,12 @@ namespace ATLab {
 
             // 5
             BlockCorrelatedOT::Receiver sid2 {io, 2};
-            const ITMacBits beaverTripleShares {sid2, circuit.andGateSize};
+            ITMacBits beaverTripleShares {sid2, circuit.andGateSize};
             const ITMacBlocks authedTmpDeltaStep5 {io, sid2, {tmpDelta}};
 
             // 6
-            const auto [masks, macs, evaluatorMaskKeys, andedMasks] {
-                populate_wires_garbler(circuit, aMatrix, bKeys, compressParam)
-            };
+            auto [masks, maskKeys, andedMasks_nonconst] {populate_wires_garbler(circuit, aMatrix, bKeys, compressParam)};
+            const auto& andedMasks {andedMasks_nonconst};
 
             // 7
             const ITMacBitKeys evaluatorAndedMasks {io, globalKey.get_COT_sender(), circuit.andGateSize};
@@ -284,32 +292,14 @@ namespace ATLab {
 
 BENCHMARK_INIT
 BENCHMARK_START
-            // 8, 9
-            // Bitset tmpBeaverTripleLsb(circuit.andGateSize);
-            // for (size_t gateIter {0}, andGateIndex {0}; gateIter != circuit.gateSize; ++gateIter) {
-            //     const auto& gate {circuit.gates[gateIter]};
-            //     if (gate.type != Gate::Type::AND) {
-            //         continue;
-            //     }
-            //     // AND gate
-            //
-            //     // <a_i a_j> ^ <a_i b_j> ^ <a_j b_i> ^ <beaver triple share>
-            //     emp::block tmpBeaverTriple {_mm_xor_si128(macs[gate.in0], macs[gate.in1])};
-            //     xor_to(tmpBeaverTriple, authedAndedMasks.get_mac(0, andGateIndex));
-            //     xor_to(tmpBeaverTriple, beaverTripleShares.get_mac(0, andGateIndex));
-            //     xor_to(tmpBeaverTriple,
-            //         and_all_bits(authedAndedMasks[andGateIndex] ^ beaverTripleShares[andGateIndex], globalKey.get_alpha_0())
-            //     );
-            //     xor_to(tmpBeaverTriple, and_all_bits(masks[gate.in0], evaluatorMaskKeys[gate.in1]));
-            //     xor_to(tmpBeaverTriple, and_all_bits(masks[gate.in1], evaluatorMaskKeys[gate.in0]));
-            //
-            //     tmpBeaverTripleLsb.set(andGateIndex, get_LSB(tmpBeaverTriple));
-            //
-            //     ++andGateIndex;
-            // }
             // 8
-            auto dualAuthedB {matrix * dualAuthedBStar};
+            const ITMacBlockKeys dualAuthedB {matrix * dualAuthedBStar};
+            DualKeyAuthed_ab_Calculator ab {circuit, matrix, aMatrix, dualAuthedB};
+BENCHMARK_END(G matrix * matrix);
+
+BENCHMARK_START
             // 9
+            std::vector<emp::block> tmpBeaverTriple(circuit.andGateSize, zero_block()); // \tilde{b_k}
             Bitset tmpBeaverTripleLsb(circuit.andGateSize);
             for (size_t gateIter {0}, andGateIndex {0}; gateIter != circuit.gateSize; ++gateIter) {
                 const auto& gate {circuit.gates[gateIter]};
@@ -318,21 +308,29 @@ BENCHMARK_START
                 }
                 // AND gate
 
-                // <a_i a_j> ^ <a_i b_j> ^ <a_j b_i> ^ <beaver triple share>
-                emp::block tmpBeaverTriple {_mm_set_epi64x(0, 0)};
-                xor_to(tmpBeaverTriple, authedAndedMasks.get_mac(0, andGateIndex));
-                xor_to(tmpBeaverTriple, beaverTripleShares.get_mac(0, andGateIndex));
-                xor_to(tmpBeaverTriple,
-                    and_all_bits(authedAndedMasks[andGateIndex] ^ beaverTripleShares[andGateIndex], globalKey.get_alpha_0())
-                );
+                // <a_i a_j> ^ <beaver triple share> ^ <a_i b_j> ^ <a_j b_i>
+                emp::block& sum {tmpBeaverTriple[andGateIndex]};
+                xor_to(sum, authedAndedMasks.get_mac(0, andGateIndex));
+                xor_to(sum, beaverTripleShares.get_mac(0, andGateIndex));
+                xor_to(sum, and_all_bits(
+                    authedAndedMasks[andGateIndex] ^ beaverTripleShares[andGateIndex],
+                    globalKey.get_alpha_0()
+                ));
 
-                tmpBeaverTripleLsb.set(andGateIndex, get_LSB(tmpBeaverTriple));
+                xor_to(sum, ab(gate.in0, gate.in1));
+                xor_to(sum, ab(gate.in1, gate.in0));
+
+                tmpBeaverTripleLsb.set(andGateIndex, get_LSB(sum));
                 ++andGateIndex;
             }
 
-BENCHMARK_END(G step 8);
+            std::vector<BitsetBlock> rawTmpBeaverTripleLsb {dump_raw_blocks(tmpBeaverTripleLsb)};
+            io.send_data(rawTmpBeaverTripleLsb.data(), rawTmpBeaverTripleLsb.size() * sizeof(BitsetBlock));
+BENCHMARK_END(G step 9);
 
-            return {std::move(matrix), std::move(bKeys)};
+            ITMacBitKeys beaverTripleKeys {io, globalKey.get_COT_sender(), circuit.andGateSize};
+
+            return {std::move(masks), std::move(maskKeys), std::move(beaverTripleShares), std::move(beaverTripleKeys)};
         }
     }
 
@@ -340,11 +338,11 @@ BENCHMARK_END(G step 8);
         PreprocessedData preprocess(emp::NetIO& io, const Circuit& circuit) {
 BENCHMARK_INIT;
             GlobalKeySampling::Evaluator globalKey {io};
-            const auto n {circuit.andGateSize + circuit.inputSize1};
-            const auto compressParam {static_cast<size_t>(calc_compression_parameter(n))};
-            const auto m {n + circuit.inputSize0};
+            const auto evaluatorIndependentWireSize {circuit.andGateSize + circuit.inputSize1};
+            const auto compressParam {static_cast<size_t>(calc_compression_parameter(evaluatorIndependentWireSize))};
+            const auto independentWireSize {evaluatorIndependentWireSize + circuit.inputSize0};
 
-            auto matrix {gen_and_send_matrix(io, n, compressParam)};
+            auto matrix {gen_and_send_matrix(io, evaluatorIndependentWireSize, compressParam)};
 
 BENCHMARK_START;
             // 2
@@ -367,7 +365,7 @@ BENCHMARK_START;
             std::vector<emp::block> sid1Keys {dualAuthedBStar.get_all_macs()};
             sid1Keys.push_back(globalKey.get_delta());
             BlockCorrelatedOT::Sender sid1 {io, std::move(sid1Keys)};
-            const ITMacBitKeys aMatrix {sid1, m};
+            const ITMacBitKeys aMatrix {sid1, independentWireSize};
 
             ITMacBlockKeys tmpDelta {io, sid1, 1};
 BENCHMARK_END(E step 4); // Bottleneck
@@ -381,9 +379,8 @@ BENCHMARK_END(E step 5);
 
 BENCHMARK_START
             // 6
-            const auto [masks, macs, garblerMaskKeys, andedMasks] {
-                populate_wires_evaluator(circuit, b, aMatrix, compressParam)
-            };
+            auto [masks, maskKeys, andedMasks_nonconst] {populate_wires_evaluator(circuit, b, aMatrix, compressParam)};
+            const auto& andedMasks {andedMasks_nonconst};
 BENCHMARK_END(E step 6);
 
 BENCHMARK_START
@@ -391,12 +388,64 @@ BENCHMARK_START
                 io, globalKey.get_COT_receiver(), andedMasks.build_bitset(circuit.andGateSize)
             };
             const ITMacBitKeys garblerAndedMasks {io, sid2, circuit.andGateSize};
+            io.flush();
 BENCHMARK_END(E step 7);
+
 BENCHMARK_START
             // 8
-            const auto dualAuthedB {matrix * dualAuthedBStar};
+            // const auto dualAuthedB {matrix * dualAuthedBStar};
+            DualKeyAuthed_ab_Calculator ab {circuit, matrix, aMatrix};
 BENCHMARK_END(E step 8);
-            return {std::move(matrix), std::move(b)};
+
+BENCHMARK_START
+            // 9
+            std::vector<emp::block> tmpBeaverTriple(circuit.andGateSize, zero_block()); // \tilde{b_k}
+            Bitset tmpBeaverTripleLsb(circuit.andGateSize);
+            for (size_t gateIter {0}, andGateIndex {0}; gateIter != circuit.gateSize; ++gateIter) {
+                const auto& gate {circuit.gates[gateIter]};
+                if (!gate.is_and()) {
+                    continue;
+                }
+                // AND gate
+
+                // <a_i a_j> ^ <beaver triple share> ^ <a_i b_j> ^ <a_j b_i>
+                emp::block& sum {tmpBeaverTriple[andGateIndex]};
+                xor_to(sum, garblerAndedMasks.get_local_key(0, andGateIndex));
+                xor_to(sum, beaverTripleKeys.get_local_key(0, andGateIndex));
+
+                xor_to(sum, ab(gate.in0, gate.in1));
+                xor_to(sum, ab(gate.in1, gate.in0));
+
+                tmpBeaverTripleLsb.set(andGateIndex, get_LSB(sum));
+                ++andGateIndex;
+            }
+
+            std::vector<BitsetBlock> rawReceivedLsb(tmpBeaverTripleLsb.num_blocks());
+            io.recv_data(rawReceivedLsb.data(), rawReceivedLsb.size() * sizeof(BitsetBlock));
+            Bitset receivedLsb {rawReceivedLsb.begin(), rawReceivedLsb.end()};
+            receivedLsb.resize(circuit.andGateSize);
+
+            Bitset beaverTripleShare {receivedLsb ^ tmpBeaverTripleLsb};
+            beaverTripleShare ^= authedAndedMasks.bits(); // \hat{b}_k = \tilde{b}_k ^ (b_i & b_j)
+BENCHMARK_END(E step 9)
+
+BENCHMARK_START
+            ITMacBits authedBeaverTriple {io, globalKey.get_COT_receiver(), std::move(beaverTripleShare)};
+BENCHMARK_END(E step 10)
+
+            // DEBUG
+            // std::clog << "key: ";
+            // for (size_t i {0}, andGateIter {0}; andGateIter != 8; ++i) {
+            //     const auto& gate {circuit.gates[i]};
+            //     if (!gate.is_and()) {
+            //         continue;
+            //     }
+            //     std::clog << get_LSB(dualAuthed_ab(gate.in0, gate.in1));
+            //     ++andGateIter;
+            // }
+            // std::clog << '\n';
+
+            return {std::move(masks), std::move(maskKeys), std::move(authedBeaverTriple), std::move(beaverTripleKeys)};
         }
     }
 }
