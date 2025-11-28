@@ -93,6 +93,7 @@ if (ENABLE_TEST)
         tests/vector_inner_product_benchmark.test.cpp
         tests/circuit.test.cpp
         tests/preprocessor.test.cpp
+        tests/full-execution.test.cpp
     )
 
     add_executable(${TEST_NAME} ${TEST_SRC})

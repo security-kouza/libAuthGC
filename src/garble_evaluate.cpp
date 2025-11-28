@@ -2,15 +2,10 @@
 
 namespace ATLab {
     namespace Garbler {
-        GarbledCircuit garble(
-            emp::NetIO&         io,
-            const Circuit&      circuit,
-            const emp::block&   globalKey,
-            const ITMacBits&    masks,
-            const ITMacBitKeys& maskKeys,
-            const ITMacBits&    beaverTriples,
-            const ITMacBitKeys& beaverTripleKeys
-        ) {
+        GarbledCircuit garble(emp::NetIO& io, const Circuit& circuit, const PreprocessedData& wireMasks) {
+            const auto& [masks, maskKeys, beaverTriples, beaverTripleKeys] {wireMasks};
+            const emp::block& globalKey {maskKeys.get_global_key(0)};
+
             // Initialize input wire labels
             std::vector<emp::block> label0(circuit.wireSize), label1(circuit.wireSize);
             THE_GLOBAL_PRNG.random_block(label0.data(), circuit.totalInputSize);
@@ -25,8 +20,7 @@ namespace ATLab {
 
             // process output wires gate by gate
             for (size_t gateIter {0}, andGateIter {0}; gateIter != circuit.gateSize; ++gateIter) {
-                const auto& gate {circuit.gates[gateIter]};
-                switch (gate.type) {
+                switch (const auto& gate {circuit.gates[gateIter]}; gate.type) {
                 case Gate::Type::NOT: {
                     label0[gate.out] = label1[gate.in0];
                     label1[gate.out] = label0[gate.in0];
@@ -98,14 +92,14 @@ namespace ATLab {
         }
 
         EvaluateResult evaluate(
-            emp::NetIO&                     io,
             const Circuit&                  circuit,
-            const ITMacBits&                masks,
-            const ITMacBits&                beaverTriples,
+            const PreprocessedData&         wireMasks,
             const ReceivedGarbledCircuit&   garbledCircuit,
-            Bitset                          maskedValues,
-            std::vector<emp::block>         labels
+            std::vector<emp::block>         labels,
+            Bitset                          maskedValues
         ) {
+            const auto& masks {wireMasks.masks};
+            const auto& beaverTriples {wireMasks.beaverTripleShares};
             const auto& garbledTables {garbledCircuit.garbledTables};
             const auto& wireMaskShift {garbledCircuit.wireMaskShift};
 

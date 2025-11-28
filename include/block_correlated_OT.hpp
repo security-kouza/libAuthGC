@@ -60,6 +60,7 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
+    public:
         static OT& Get_simple_OT(const emp::NetIO::Role role) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
@@ -74,7 +75,6 @@ namespace ATLab::BlockCorrelatedOT {
 
         const std::vector<emp::block> _deltaArr;
         const emp::NetIO::Role role;
-    public:
         const size_t deltaArrSize;
         Sender(emp::NetIO& io, std::vector<emp::block> deltaArr) :
             _deltaArr(std::move(deltaArr)),
@@ -151,6 +151,7 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
+    public:
         static OT& Get_simple_OT(const emp::NetIO::Role role) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
@@ -163,7 +164,6 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-    public:
         const size_t deltaArrSize; // L
         const emp::NetIO::Role role;
 

@@ -4,6 +4,7 @@
 #include <circuit_parser.hpp>
 
 #include "global_key_sampling.hpp"
+#include "preprocess.hpp"
 
 namespace ATLab {
     inline emp::block hash(const emp::block& block, const Wire w, const int pad) {
@@ -19,15 +20,7 @@ namespace ATLab {
             GarbledTableVec garbledTables;
             Bitset wireMaskShift;
         };
-        GarbledCircuit garble(
-            emp::NetIO&         io,
-            const Circuit&      circuit,
-            const emp::block&   globalKey,
-            const ITMacBits&    masks,
-            const ITMacBitKeys& maskKeys,
-            const ITMacBits&    beaverTriples,
-            const ITMacBitKeys& beaverTripleKeys
-        );
+        GarbledCircuit garble(emp::NetIO& io, const Circuit& circuit, const PreprocessedData& wireMasks);
     }
 
     namespace Evaluator {
@@ -45,13 +38,11 @@ namespace ATLab {
         };
 
         EvaluateResult evaluate(
-            emp::NetIO&                     io,
             const Circuit&                  circuit,
-            const ITMacBits&                masks,
-            const ITMacBits&                beaverTriples,
+            const PreprocessedData&         wireMasks,
             const ReceivedGarbledCircuit&   garbledCircuit,
-            Bitset                          maskedValues,
-            std::vector<emp::block>         labels
+            std::vector<emp::block>         labels,
+            Bitset                          maskedValues
         );
     }
 }
