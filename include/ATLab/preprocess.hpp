@@ -74,8 +74,6 @@ namespace ATLab {
                         transposedRawMacs.data() + col * transposedCol, transposedCol
                     };
 
-                    emp::block mac {compressMatrixRow * macVec};
-
                     _resFlatMatrix.push_back(_mm_xor_si128(
                         compressMatrixRow * macVec,
                         and_all_bits(aMatrix[col], alpha)

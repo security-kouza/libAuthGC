@@ -201,9 +201,13 @@ namespace ATLab {
             _bits {std::move(bits)},
             _macs {std::move(macs)}
         {
-            if (_macs.size() % _bits.size()) {
+#ifdef DEBUG
+            if (_bits.empty()) {
+                assert(_bits.empty());
+            } else if (_macs.size() % _bits.size()) {
                 throw std::runtime_error{"The size of macs is not a multiple of the size of bits."};
             }
+#endif // DEBUG
         }
 
         /**
@@ -283,12 +287,14 @@ namespace ATLab {
             _localKeys {std::move(localKeys)},
             _globalKeys {std::move(globalKeys)}
         {
+#ifdef DEBUG
             if (_globalKeys.empty()) {
                 throw std::runtime_error{"Global keys cannot be empty."};
             }
             if (_localKeys.size() % _globalKeys.size() != 0) {
                 throw std::runtime_error{"The localKeys size if not a multiple of the globalKeys size."};
             }
+#endif // DEBUG
         }
 
         /**

@@ -101,7 +101,7 @@ BENCHMARK_START;
             }
             ot.recv(inputLabels.data() + circuit.inputSize0, choices, circuit.inputSize1);
 
-            std::vector<BitsetBlock> rawGarblerInput1Masks {calc_bitset_block(circuit.inputSize1)};
+            std::vector<BitsetBlock> rawGarblerInput1Masks(calc_bitset_block(circuit.inputSize1));
             io.recv_data(rawGarblerInput1Masks.data(), rawGarblerInput1Masks.size() * sizeof(BitsetBlock));
             Bitset garblerInput1Masks {rawGarblerInput1Masks.begin(), rawGarblerInput1Masks.end()};
             garblerInput1Masks.resize(circuit.inputSize1);

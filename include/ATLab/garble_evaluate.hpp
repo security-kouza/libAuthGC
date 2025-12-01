@@ -2,6 +2,7 @@
 #define ATLab_GARBLE_HPP
 
 #include <circuit_parser.hpp>
+#include <vector>
 
 #include "global_key_sampling.hpp"
 #include "preprocess.hpp"
@@ -9,7 +10,7 @@
 namespace ATLab {
     inline emp::block hash(const emp::block& block, const Wire w, const int pad) {
         const std::array<emp::block, 2> blocks {block, _mm_set_epi64x(w, pad)};
-        return emp::Hash::hash_for_block(blocks.data(), blocks.size());
+        return emp::Hash::hash_for_block(blocks.data(), blocks.size() * sizeof(emp::block));
     }
 
     using GarbledTableVec = std::vector<std::array<emp::block, 2>>;
@@ -20,7 +21,13 @@ namespace ATLab {
             GarbledTableVec garbledTables;
             Bitset wireMaskShift;
         };
-        GarbledCircuit garble(emp::NetIO& io, const Circuit& circuit, const PreprocessedData& wireMasks);
+
+        GarbledCircuit garble(
+            emp::NetIO& io,
+            const Circuit& circuit,
+            const PreprocessedData& wireMasks,
+            std::vector<emp::block> label0 = {}
+        );
     }
 
     namespace Evaluator {
