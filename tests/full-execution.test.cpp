@@ -13,26 +13,39 @@
 namespace {
     using namespace ATLab;
 
-    Bitset full_execution_tester(
-        const std::string& circuitFile,
-        Bitset input0,
-        Bitset input1
+    struct TestVector {
+        unsigned long input0, input1, output;
+    };
+
+    template <size_t N>
+    using TestType = std::array<TestVector, N>;
+
+    template <size_t N>
+    void full_execution_tester(
+        const std::string& circuitFile, TestType<N> tests
     ) {
-        Bitset output;
+        const Circuit circuit {circuitFile};
+        std::array<Bitset, N> outputs;
         std::thread garblerThread{[&](){
             auto& io {server_io()};
-            Garbler::full_protocol(io, circuitFile, std::move(input0));
+            for (size_t i {0}; i != N; ++i) {
+                Garbler::full_protocol(io, circuit, Bitset(circuit.inputSize0, tests[i].input0));
+            }
             io.flush();
         }}, evaluatorThread{[&]() {
             auto& io {client_io()};
-            output = Evaluator::full_protocol(io, circuitFile, std::move(input1));
+            for (size_t i {0}; i != N; ++i) {
+                outputs[i] = Evaluator::full_protocol(io, circuit, Bitset(circuit.inputSize1, tests[i].input1));
+            }
             io.flush();
         }};
-
         garblerThread.join();
         evaluatorThread.join();
 
-        return output;
+        for (size_t i {0}; i != N; ++i) {
+            EXPECT_EQ(outputs[i].to_ulong(), tests[i].output)
+                << ", where i = " << i << " , circuit = " << circuitFile << '\n';
+        }
     }
 
     template<class PreprocessedData>
@@ -60,10 +73,17 @@ namespace {
         };
     }
 
-    Bitset zero_evaluate_test(const Circuit& circuit, const Evaluator::ReceivedGarbledCircuit& gc, Bitset inputs) {
+    Bitset zero_evaluate_execute(
+        const Circuit& circuit,
+        const Evaluator::ReceivedGarbledCircuit& gc,
+        Bitset input0,
+        const Bitset& input1
+    ) {
         auto one_block {[]() {
             return _mm_set_epi64x(0, 1);
         }};
+
+        Bitset inputs {merge(std::move(input0), input1)};
 
         std::vector<emp::block> labels(inputs.size(), zero_block());
         for (size_t i {0}; i != inputs.size(); ++i) {
@@ -88,16 +108,11 @@ namespace {
         return result;
     }
 
-
-    template <size_t N>
-    using TestType = std::array<std::pair<unsigned long, unsigned long>, N>;
-
     template <size_t N>
     void zero_tester(
         const std::string& circuitFile,
         const TestType<N>& tests
     ) {
-
         const Circuit circuit {circuitFile};
 
         GarbledTableVec garbledTables;
@@ -126,65 +141,55 @@ namespace {
 
         for (size_t i {0}; i < tests.size(); ++i) {
             EXPECT_EQ(
-                zero_evaluate_test(circuit, gc, Bitset{circuit.totalInputSize, tests[i].first}).to_ulong(),
-                static_cast<unsigned long>(tests[i].second)
-            ) << ", where i = " << i << '\n';
+                zero_evaluate_execute(
+                    circuit,
+                    gc,
+                    Bitset{circuit.inputSize0, tests[i].input0},
+                    Bitset{circuit.inputSize1, tests[i].input1}
+                ).to_ulong(),
+                tests[i].output
+            ) << ", where i = " << i << " of circuit " << circuitFile << '\n';
         }
     }
+
+    constexpr TestType<4> andTests {{
+        {0, 0, 0},
+        {0, 1, 0},
+        {1, 0, 0},
+        {1, 1, 1}
+    }}, xorTests {{
+        {0, 0, 0},
+        {0, 1, 1},
+        {1, 0, 1},
+        {1, 1, 0}
+    }};
+    constexpr TestType<2> notTests {{
+        {0, 0, 1},
+        {1, 0, 0}
+    }};
+    constexpr TestType<6> adderTests {{
+        {0, 0, 0},
+        {1, 1, 2},
+        {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFFul * 2},
+        {0xFFFFFFFF, 1, 1ul << 32},
+        {1283741ul, 19287387, 1283741 + 19287387},
+    }};
+
 }
 
 using ATLab::Bitset;
 
-TEST(full_execution, one_gate_AND) {
-    // const std::string circuitFile {"circuits/bristol_format/adder_32bit.txt"};
-    // const auto circuit {ATLab::Circuit("test/ands.txt")};
-    const std::string circuitFile {"circuits/one-gate-AND.txt"};
-    constexpr std::array<std::array<unsigned long, 3>, 1> truthTable {{
-        // {0, 0, 0},
-        // {0, 1, 0},
-        // {1, 0, 0},
-        {1, 1, 1},
-    }};
-    for (size_t i {0}; i < truthTable.size(); ++i) {
-        EXPECT_EQ(
-            full_execution_tester(
-                circuitFile,
-                Bitset{1, truthTable[i][0]},
-                Bitset{1, truthTable[i][1]})
-            .to_ulong(),
-            truthTable[i][2]
-        ) << ", where i = " << i << '\n';
-    }
-
+TEST(execution, full) {
+    full_execution_tester("circuits/one-gate-AND.txt", andTests);
+    full_execution_tester("circuits/one-gate-XOR.txt", xorTests);
+    full_execution_tester("circuits/one-gate-NOT.txt", notTests);
+    full_execution_tester("circuits/bristol_format/adder_32bit.txt", adderTests);
 }
 
 // Setting masks, Label0 to zero, global keys to 1
-TEST(full_execution, zero_test) {
-    zero_tester("circuits/one-gate-AND.txt", TestType<4> {{
-        {0, 0},
-        {1, 0},
-        {2, 0},
-        {3, 1}
-    }});
-
-    zero_tester("circuits/one-gate-XOR.txt", TestType<4>{{
-        {0, 0},
-        {1, 1},
-        {2, 1},
-        {3, 0}
-    }});
-
-    zero_tester("circuits/one-gate-NOT.txt", TestType<2> {{
-        {0, 1},
-        {1, 0}
-    }});
-
-    zero_tester("circuits/bristol_format/adder_32bit.txt", TestType<6>{{
-        {(1ul << 32) + 1, 2},
-        {(55ul << 32) + 196, 55 + 196},
-        {(1283741ul << 32) + 19287387, 1283741 + 19287387},
-        {0, 0},
-        {static_cast<unsigned long>(-1), 0xFFFFFFFFul * 2},
-        {(~0ul << 32) + 1, 1ul << 32}
-    }});
+TEST(execution, zero_labels) {
+    zero_tester("circuits/one-gate-AND.txt", andTests);
+    zero_tester("circuits/one-gate-XOR.txt", xorTests);
+    zero_tester("circuits/one-gate-NOT.txt", notTests);
+    zero_tester("circuits/bristol_format/adder_32bit.txt", adderTests);
 }

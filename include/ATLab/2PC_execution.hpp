@@ -10,11 +10,8 @@
 
 namespace ATLab {
     namespace Garbler {
-        inline void full_protocol(emp::NetIO& io, const std::string& circuitFile, Bitset input) {
+        inline void full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
 BENCHMARK_INIT;
-BENCHMARK_START;
-            Circuit circuit {circuitFile};
-BENCHMARK_END(garbler circuit parser);
 BENCHMARK_START;
             input.resize(circuit.inputSize0);
             const auto wireMasks {preprocess(io, circuit)};
@@ -28,7 +25,7 @@ BENCHMARK_START;
 
             Bitset maskedValues;
             maskedValues.reserve(circuit.inputSize0);
-            for (Wire w {0}; w != circuit.inputSize0; ++w) {
+            for (size_t w {0}; w != circuit.inputSize0; ++w) {
                 maskedValues.push_back(input[w] ^ wireMasks.masks[w]);
             }
 
@@ -37,18 +34,31 @@ BENCHMARK_START;
 
             std::vector<emp::block> garblerInputLabels;
             garblerInputLabels.reserve(circuit.inputSize0);
-            for (Wire w {0}; w != circuit.inputSize0; ++w) {
+            for (size_t w {0}; w != circuit.inputSize0; ++w) {
                 garblerInputLabels.push_back(maskedValues[w] ? garbledCircuit.label1[w] : garbledCircuit.label0[w]);
             }
             io.send_data(garblerInputLabels.data(), garblerInputLabels.size() * sizeof(emp::block));
 
+            // send labels for evaluator's inputs
             BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Sender::Get_simple_OT(io.role)};
-            ot.send(
-                &garbledCircuit.label0[circuit.inputSize0],
-                &garbledCircuit.label1[circuit.inputSize0],
-                circuit.inputSize1
-            );
+            std::vector<emp::block> evaluatorLabel0(circuit.inputSize1);
+            std::vector<emp::block> evaluatorLabel1(circuit.inputSize1);
+            for (size_t i {0}; i != circuit.inputSize1; ++i) {
+                const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
+                const bool garblerMaskShare {wireMasks.masks[wire]};
+                const auto& labelZero {garbledCircuit.label0[wire]};
+                const auto& labelOne {garbledCircuit.label1[wire]};
+                if (garblerMaskShare) {
+                    evaluatorLabel0[i] = labelOne;
+                    evaluatorLabel1[i] = labelZero;
+                } else {
+                    evaluatorLabel0[i] = labelZero;
+                    evaluatorLabel1[i] = labelOne;
+                }
+            }
+            ot.send(evaluatorLabel0.data(), evaluatorLabel1.data(), circuit.inputSize1);
 
+            // send masked values for evaluator's inputs
             Bitset input1masks;
             input1masks.reserve(circuit.inputSize1);
             for (size_t i {circuit.inputSize0}; i != circuit.totalInputSize; ++i) {
@@ -68,15 +78,16 @@ BENCHMARK_START;
 BENCHMARK_END(garbler online);
 BENCHMARK_START;
         }
+
+        inline void full_protocol(emp::NetIO& io, const std::string& circuitFile, Bitset input) {
+            full_protocol(io, Circuit{circuitFile}, std::move(input));
+        }
     }
 
     namespace Evaluator {
-        inline Bitset full_protocol(emp::NetIO& io, const std::string& circuitFile, Bitset input) {
+        [[nodiscard]]
+        inline Bitset full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
 BENCHMARK_INIT
-BENCHMARK_START;
-
-            Circuit circuit {circuitFile};
-BENCHMARK_END(evaluator circuit parser);
 BENCHMARK_START;
             input.resize(circuit.inputSize1);
             const auto wireMasks {preprocess(io, circuit)};
@@ -97,7 +108,8 @@ BENCHMARK_START;
             BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Receiver::Get_simple_OT(io.role)};
             auto* choices = new bool[circuit.inputSize1];
             for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                choices[i] = input[i];
+                const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
+                choices[i] = input[i] ^ wireMasks.masks[wire];
             }
             ot.recv(inputLabels.data() + circuit.inputSize0, choices, circuit.inputSize1);
 
@@ -105,8 +117,8 @@ BENCHMARK_START;
             io.recv_data(rawGarblerInput1Masks.data(), rawGarblerInput1Masks.size() * sizeof(BitsetBlock));
             Bitset garblerInput1Masks {rawGarblerInput1Masks.begin(), rawGarblerInput1Masks.end()};
             garblerInput1Masks.resize(circuit.inputSize1);
-            for (size_t i {0}, j {circuit.inputSize0}; i != circuit.inputSize1; ++i, ++j) {
-                inputMaskedValues.push_back(input[i] ^ wireMasks.masks[j] ^ garblerInput1Masks[i]);
+            for (size_t i {0}; i != circuit.inputSize1; ++i) {
+                inputMaskedValues.push_back(choices[i] ^ garblerInput1Masks[i]);
             }
 
             const auto& [maskedValues, labels] {
@@ -132,6 +144,11 @@ BENCHMARK_START;
             delete[] choices;
 BENCHMARK_END(evaluator online);
             return output;
+        }
+
+        [[nodiscard]]
+        inline Bitset full_protocol(emp::NetIO& io, const std::string& circuitFile, Bitset input) {
+            return full_protocol(io, Circuit{circuitFile}, std::move(input));
         }
     }
 }

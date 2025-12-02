@@ -141,6 +141,17 @@ namespace ATLab {
     inline emp::block zero_block() {
         return _mm_set_epi64x(0, 0);
     }
+
+    [[nodiscard]]
+    inline Bitset merge(Bitset left, Bitset right) {
+        const size_t mergedSize {left.size() + right.size()};
+        left.resize(mergedSize);
+        left <<= right.size();
+
+        right.resize(mergedSize);
+        left |= right;
+        return left;
+    }
 }
 
 #endif // REVELIO_UTILS
