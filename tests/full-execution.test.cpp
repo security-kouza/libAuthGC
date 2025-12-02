@@ -12,6 +12,7 @@
 
 namespace {
     using namespace ATLab;
+    using namespace std::literals;
 
     struct TestVector {
         unsigned long input0, input1, output;
@@ -108,15 +109,7 @@ namespace {
         return result;
     }
 
-    template <size_t N>
-    void zero_tester(
-        const std::string& circuitFile,
-        const TestType<N>& tests
-    ) {
-        const Circuit circuit {circuitFile};
-
-        GarbledTableVec garbledTables;
-        Bitset wireMaskShift;
+    Evaluator::ReceivedGarbledCircuit  gen_zero_gc(const Circuit& circuit) {
         Evaluator::ReceivedGarbledCircuit gc;
 
         std::thread garblerThread{[&](){
@@ -139,6 +132,18 @@ namespace {
         garblerThread.join();
         evaluatorThread.join();
 
+        return gc;
+    }
+
+    template <size_t N>
+    void zero_tester(
+        const std::string& circuitFile,
+        const TestType<N>& tests
+    ) {
+        const Circuit circuit {circuitFile};
+
+        const auto gc {gen_zero_gc(circuit)};
+
         for (size_t i {0}; i < tests.size(); ++i) {
             EXPECT_EQ(
                 zero_evaluate_execute(
@@ -147,6 +152,31 @@ namespace {
                     Bitset{circuit.inputSize0, tests[i].input0},
                     Bitset{circuit.inputSize1, tests[i].input1}
                 ).to_ulong(),
+                tests[i].output
+            ) << ", where i = " << i << " of circuit " << circuitFile << '\n';
+        }
+    }
+
+    struct TestVectorLarge {
+        Bitset input0, input1, output;
+    };
+
+    // For inputs/outputs longer than 64 bits
+    void zero_tester_large(
+        const std::string& circuitFile,
+        std::vector<TestVectorLarge> tests
+    ) {
+        const Circuit circuit {circuitFile};
+        Evaluator::ReceivedGarbledCircuit gc {gen_zero_gc(circuit)};
+
+        for (size_t i {0}; i < tests.size(); ++i) {
+            EXPECT_EQ(
+                zero_evaluate_execute(
+                    circuit,
+                    gc,
+                    tests[i].input0,
+                    tests[i].input1
+                ),
                 tests[i].output
             ) << ", where i = " << i << " of circuit " << circuitFile << '\n';
         }
@@ -174,7 +204,14 @@ namespace {
         {0xFFFFFFFF, 1, 1ul << 32},
         {1283741ul, 19287387, 1283741 + 19287387},
     }};
-
+    const std::vector<TestVectorLarge> aesTest {{
+        Bitset{128, 0},
+        Bitset{128, 0},
+        Bitset{
+            "0111010011010100001011000101001110011010010111110011001000010001"
+            "1101110000110100010100011111011100101011110100101001011101100110"s
+        },
+    }};
 }
 
 using ATLab::Bitset;
@@ -192,4 +229,8 @@ TEST(execution, zero_labels) {
     zero_tester("circuits/one-gate-XOR.txt", xorTests);
     zero_tester("circuits/one-gate-NOT.txt", notTests);
     zero_tester("circuits/bristol_format/adder_32bit.txt", adderTests);
+}
+
+TEST(AES, zero_labels) {
+    zero_tester_large("circuits/bristol_format/AES-non-expanded.txt", aesTest);
 }

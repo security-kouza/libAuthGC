@@ -6,9 +6,7 @@
 #include <stdexcept>
 
 namespace ATLab {
-	Circuit::Circuit(const std::string& filename):
-		andGateSize {0}
-	{
+	Circuit::Circuit(const std::string& filename) {
 		std::ifstream fin {filename};
 		if (!fin) {
 			throw std::runtime_error{"Cannot open file " + filename};
