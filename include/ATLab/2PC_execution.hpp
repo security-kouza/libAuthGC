@@ -7,35 +7,30 @@
 #include "circuit_parser.hpp"
 #include "garble_evaluate.hpp"
 #include "preprocess.hpp"
+#include "ATLab/benchmark.hpp"
 
 namespace ATLab {
     namespace Garbler {
-        inline void full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
-BENCHMARK_INIT;
-BENCHMARK_START;
-            input.resize(circuit.inputSize0);
-            const auto wireMasks {preprocess(io, circuit)};
-BENCHMARK_END(garbler preprocessor);
-BENCHMARK_START;
-            const auto garbledCircuit {garble(io, circuit, wireMasks)};
-BENCHMARK_END(gen garbled circuit);
-BENCHMARK_START;
-
-            // online
-
+        inline void online(
+            emp::NetIO& io,
+            const Circuit& circuit,
+            const GarbledCircuit& gc,
+            const PreprocessedData& wireMasks,
+            const Bitset& input
+        ) {
             Bitset maskedValues;
             maskedValues.reserve(circuit.inputSize0);
             for (size_t w {0}; w != circuit.inputSize0; ++w) {
                 maskedValues.push_back(input[w] ^ wireMasks.masks[w]);
             }
 
-            std::vector<BitsetBlock> rawMaskedValues {dump_raw_blocks(maskedValues)};
+            const std::vector<BitsetBlock> rawMaskedValues {dump_raw_blocks(maskedValues)};
             io.send_data(rawMaskedValues.data(), rawMaskedValues.size() * sizeof(BitsetBlock));
 
             std::vector<emp::block> garblerInputLabels;
             garblerInputLabels.reserve(circuit.inputSize0);
             for (size_t w {0}; w != circuit.inputSize0; ++w) {
-                garblerInputLabels.push_back(maskedValues[w] ? garbledCircuit.label1[w] : garbledCircuit.label0[w]);
+                garblerInputLabels.push_back(maskedValues[w] ? gc.label1[w] : gc.label0[w]);
             }
             io.send_data(garblerInputLabels.data(), garblerInputLabels.size() * sizeof(emp::block));
 
@@ -46,8 +41,8 @@ BENCHMARK_START;
             for (size_t i {0}; i != circuit.inputSize1; ++i) {
                 const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
                 const bool garblerMaskShare {wireMasks.masks[wire]};
-                const auto& labelZero {garbledCircuit.label0[wire]};
-                const auto& labelOne {garbledCircuit.label1[wire]};
+                const auto& labelZero {gc.label0[wire]};
+                const auto& labelOne {gc.label1[wire]};
                 if (garblerMaskShare) {
                     evaluatorLabel0[i] = labelOne;
                     evaluatorLabel1[i] = labelZero;
@@ -75,26 +70,31 @@ BENCHMARK_START;
             }
             std::vector<BitsetBlock> rawOutputMasks {dump_raw_blocks(outputMasks)};
             io.send_data(rawOutputMasks.data(), rawOutputMasks.size() * sizeof(BitsetBlock));
-BENCHMARK_END(garbler online);
-BENCHMARK_START;
         }
 
-        inline void full_protocol(emp::NetIO& io, const std::string& circuitFile, Bitset input) {
-            full_protocol(io, Circuit{circuitFile}, std::move(input));
+        inline void full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
+            input.resize(circuit.inputSize0);
+            const auto wireMasks {preprocess(io, circuit)};
+            const auto gc {garble(io, circuit, wireMasks)};
+
+            online(io, circuit, gc, wireMasks, std::move(input));
+        }
+
+
+        inline void full_protocol(emp::NetIO& io, const std::string& circuitFile, const Bitset& input) {
+            full_protocol(io, Circuit{circuitFile}, input);
         }
     }
 
     namespace Evaluator {
         [[nodiscard]]
-        inline Bitset full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
-BENCHMARK_INIT
-BENCHMARK_START;
-            input.resize(circuit.inputSize1);
-            const auto wireMasks {preprocess(io, circuit)};
-BENCHMARK_END(evaluator preprocessor);
-            const auto garbledCircuit {garble(io, circuit)};
-
-BENCHMARK_START;
+        inline Bitset online(
+            emp::NetIO& io,
+            const Circuit& circuit,
+            const ReceivedGarbledCircuit& gc,
+            const PreprocessedData& wireMasks,
+            Bitset input
+        ) {
             // online
             std::vector<BitsetBlock> rawMaskedValues(calc_bitset_block(circuit.inputSize0));
             io.recv_data(rawMaskedValues.data(), rawMaskedValues.size() * sizeof(BitsetBlock));
@@ -122,7 +122,7 @@ BENCHMARK_START;
             }
 
             const auto& [maskedValues, labels] {
-                evaluate(circuit, wireMasks, garbledCircuit, std::move(inputLabels), std::move(inputMaskedValues))
+                evaluate(circuit, wireMasks, gc, std::move(inputLabels), std::move(inputMaskedValues))
             };
 
             // Get output masks
@@ -142,8 +142,20 @@ BENCHMARK_START;
             }
 
             delete[] choices;
-BENCHMARK_END(evaluator online);
             return output;
+        }
+
+        [[nodiscard]]
+        inline Bitset full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
+BENCHMARK_INIT;
+BENCHMARK_START;
+            input.resize(circuit.inputSize1);
+            const auto wireMasks {preprocess(io, circuit)};
+BENCHMARK_END(evaluator preprocessor);
+            const auto gc {garble(io, circuit)};
+BENCHMARK_START;
+            return online(io, circuit, gc, wireMasks, std::move(input));
+BENCHMARK_END(evaluator online);
         }
 
         [[nodiscard]]

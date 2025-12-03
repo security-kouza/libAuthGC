@@ -14,12 +14,17 @@
         end = std::chrono::high_resolution_clock::now();\
         std::cout << #message << ": "\
             << std::chrono::duration<double, std::milli>{end - start}.count() << "ms\n";
+    #define BENCHMARK_END_ITERATION(message, iteration)\
+        end = std::chrono::high_resolution_clock::now();\
+        std::cout << #message << ": "\
+            << std::chrono::duration<double, std::milli>{end - start}.count()/iteration << "ms\n";
 
 #else
     #define BENCHMARK_INIT ;
     #define BENCHMARK(message, code) code
     #define BENCHMARK_START ;
     #define BENCHMARK_END(message) ;
+    #define BENCHMARK_END_ITERATION(message, iteration) ;
 #endif
 
 

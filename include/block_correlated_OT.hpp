@@ -45,6 +45,7 @@ namespace ATLab::BlockCorrelatedOT {
         }
 #endif
 
+    public:
         static OT& Initialize_simple_OT(emp::NetIO& io) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
@@ -60,7 +61,6 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-    public:
         static OT& Get_simple_OT(const emp::NetIO::Role role) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
@@ -136,6 +136,7 @@ namespace ATLab::BlockCorrelatedOT {
         }
 #endif
 
+    public:
         static OT& Initialize_simple_OT(emp::NetIO& io) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
@@ -151,7 +152,6 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-    public:
         static OT& Get_simple_OT(const emp::NetIO::Role role) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();

@@ -11,10 +11,14 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/archive)
 
 include(FetchContent)
 
-# Dependencies
+option(ENABLE_BENCHMARK "Enable benchmark CLI" OFF)
 
+# Dependencies
 # Boost
 set(BOOST_INCLUDE_LIBRARIES asio)
+if (ENABLE_BENCHMARK)
+    set(BOOST_INCLUDE_LIBRARIES ${BOOST_INCLUDE_LIBRARIES} program_options)
+endif (ENABLE_BENCHMARK)
 FetchContent_Declare(
     Boost
     URL https://github.com/boostorg/boost/releases/download/boost-1.84.0/boost-1.84.0.tar.xz
@@ -72,7 +76,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${LIB})
 
 
 if (ENABLE_TEST)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC PARTY_INSTANCES_PER_THREAD=2)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=2)
     FetchContent_Declare(
         googletest
         URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
@@ -113,3 +117,12 @@ if (ENABLE_TEST)
     gtest_discover_tests(${TEST_NAME})
 
 endif (ENABLE_TEST)
+
+if (ENABLE_BENCHMARK)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=1)
+    set(BM_SRC
+        benchmark/benchmark.cpp
+    )
+    add_executable(benchmark ${BM_SRC} ${BM_HEADER})
+    target_link_libraries(benchmark PRIVATE ${PROJECT_NAME} Boost::program_options)
+endif (ENABLE_BENCHMARK)
