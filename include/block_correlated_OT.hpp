@@ -53,7 +53,7 @@ namespace ATLab::BlockCorrelatedOT {
             auto& instance = shared_ot_storage().at(role_index(io.role));
 #endif
             if (!instance) {
-                instance = std::make_unique<OT>(&io, false);
+                instance = std::make_unique<OT>(&io, true);
                 instance->setup_send();
             } else if (instance->io != &io) {
                 throw std::runtime_error{"Shared IKNP sender OT already bound to a different NetIO"};
@@ -144,7 +144,7 @@ namespace ATLab::BlockCorrelatedOT {
             auto& instance = shared_ot_storage().at(role_index(io.role));
 #endif
             if (!instance) {
-                instance = std::make_unique<OT>(&io, false);
+                instance = std::make_unique<OT>(&io, true);
                 instance->setup_recv();
             } else if (instance->io != &io) {
                 throw std::runtime_error{"Shared IKNP receiver OT already bound to a different NetIO"};
