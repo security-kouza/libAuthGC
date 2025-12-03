@@ -69,3 +69,46 @@ TEST(Circuit_Parser, populates_metadata_for_simple_circuit) {
     EXPECT_EQ(circuit.and_gate_order(5), 1);
     EXPECT_THROW(auto res {circuit.and_gate_order(4)}, std::exception);
 }
+
+TEST(Circuit_Parser, gc_check_data) {
+    /*
+        7 10
+        2 1 1
+
+        2 1 0 1 3 XOR
+        2 1 1 2 4 XOR
+        2 1 3 4 5 XOR
+        2 1 3 4 6 AND
+        2 1 5 6 7 XOR
+        2 1 6 7 8 AND
+        1 1 8 9 INV
+    */
+    const ATLab::Circuit circuit {"circuits/test_circuit.txt"};
+
+    auto test_independent_wire {[&circuit](const ATLab::Wire w) {
+        const auto& gcCheckData {circuit.gc_check_data(w)};
+        for (const auto& [gateIndex, connected] : gcCheckData) {
+            const auto& gate {circuit.gates[gateIndex]};
+
+            EXPECT_NE(connected.to_ulong(), 0);
+            if (connected.test(0)) {
+                EXPECT_TRUE(circuit.xor_source_list(gate.in0).has(w));
+            }
+            if (connected.test(1)) {
+                EXPECT_TRUE(circuit.xor_source_list(gate.in1).has(w));
+            }
+        }
+    }};
+
+    for (ATLab::Wire w {0}; w != static_cast<ATLab::Wire>(circuit.totalInputSize); ++w) {
+        test_independent_wire(w);
+    }
+
+    for (size_t i {0}; i != circuit.gateSize; ++i) {
+        const auto& gate {circuit.gates[i]};
+        if (!gate.is_and()) {
+            continue;
+        }
+        test_independent_wire(gate.out);
+    }
+}

@@ -36,6 +36,10 @@ namespace ATLab {
 			}
 		}
 
+		bool has(const Wire wire) const noexcept {
+			return _sources[wire];
+		}
+
 		[[nodiscard]] bool empty() const noexcept {
 			return _sources.none();
 		}
@@ -91,6 +95,10 @@ namespace ATLab {
 		std::vector<size_t> _andGateOrder;
 		std::vector<std::unique_ptr<XORSourceList>> _pXORSourceListVec;
 		std::unordered_map<Wire, size_t> _outputWireToGateIndex;
+
+		// size: independent wires
+		// bitset: [0] for i , [1] for j, set representing the wire is connected
+		std::vector<std::unordered_map<size_t /*gate index*/, std::bitset<2> /*connected*/>> _gcCheckData;
 	public:
 		static constexpr size_t AND_ORDER_DISABLED {std::numeric_limits<size_t>::max()};
 
@@ -129,6 +137,20 @@ namespace ATLab {
 		[[nodiscard]]
 		size_t and_gate_order_by_output_wire(const Wire outputWire) const {
 			return and_gate_order(gate_index_by_output_wire(outputWire));
+		}
+
+		[[nodiscard]]
+		size_t independent_index_map(const Wire w) const {
+			if (w < static_cast<Wire>(totalInputSize)) {
+				return w;
+			}
+			return and_gate_order_by_output_wire(w) + totalInputSize;
+		}
+
+		[[nodiscard]]
+		auto& gc_check_data(const Wire w) const {
+			const size_t independentIndex {independent_index_map(w)};
+			return _gcCheckData[independentIndex];
 		}
 	};
 }

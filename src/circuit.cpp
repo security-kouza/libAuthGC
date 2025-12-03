@@ -58,7 +58,7 @@ namespace ATLab {
 
 		size_t currentAndOrder {0};
 		for (size_t gateIter {0}; gateIter != gates.size(); ++gateIter) {
-			auto& gate {gates[gateIter]};
+			const auto& gate {gates[gateIter]};
 
 			_outputWireToGateIndex[gate.out] = gateIter;
 			const auto outWire {static_cast<size_t>(gate.out)};
@@ -81,6 +81,24 @@ namespace ATLab {
 					break;
 				}
 			}
+		}
+
+		// For gc_check
+		_gcCheckData.resize(totalInputSize + andGateSize);
+		for (size_t gateIter {0}; gateIter != gateSize; ++gateIter) {
+			const auto& gate {gates[gateIter]};
+			if (!gate.is_and()) {
+				continue;
+			}
+			_pXORSourceListVec[gate.in0]->for_each_wire([gateIter, this](const Wire w) {
+				const size_t independentIndex {independent_index_map(w)};
+				_gcCheckData[independentIndex][gateIter] = std::bitset<2>{1};
+			});
+			_pXORSourceListVec[gate.in1]->for_each_wire([gateIter, this](const Wire w) {
+				const size_t independentIndex {independent_index_map(w)};
+				auto [it, inserted] {_gcCheckData[independentIndex].try_emplace(gateIter, 0)};
+				it->second[1] = true;
+			});
 		}
 	}
 
