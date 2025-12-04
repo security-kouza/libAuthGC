@@ -147,6 +147,9 @@ namespace ATLab {
 			return and_gate_order_by_output_wire(w) + totalInputSize;
 		}
 
+		/**
+		 * @param w wire index, NOT independent wire index
+		 */
 		[[nodiscard]]
 		auto& gc_check_data(const Wire w) const {
 			const size_t independentIndex {independent_index_map(w)};

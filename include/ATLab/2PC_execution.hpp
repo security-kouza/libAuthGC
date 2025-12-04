@@ -11,6 +11,14 @@
 
 namespace ATLab {
     namespace Garbler {
+        // GCCheck
+        void check(
+            emp::NetIO& io,
+            const Circuit& circuit,
+            const PreprocessedData& wireMasks,
+            const GarbledCircuit& gc
+        );
+
         inline void online(
             emp::NetIO& io,
             const Circuit& circuit,
@@ -70,6 +78,8 @@ namespace ATLab {
             }
             std::vector<BitsetBlock> rawOutputMasks {dump_raw_blocks(outputMasks)};
             io.send_data(rawOutputMasks.data(), rawOutputMasks.size() * sizeof(BitsetBlock));
+
+            check(io, circuit, wireMasks, gc);
         }
 
         inline void full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
@@ -87,6 +97,15 @@ namespace ATLab {
     }
 
     namespace Evaluator {
+        // GCCheck
+        void check(
+            emp::NetIO& io,
+            const Circuit& circuit,
+            const PreprocessedData& wireMasks,
+            const std::vector<emp::block>& labels,
+            const Bitset& maskedValues
+        );
+
         [[nodiscard]]
         inline Bitset online(
             emp::NetIO& io,
@@ -106,12 +125,13 @@ namespace ATLab {
             io.recv_data(inputLabels.data(), circuit.inputSize0 * sizeof(emp::block));
 
             BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Receiver::Get_simple_OT(io.role)};
-            auto* choices = new bool[circuit.inputSize1];
+            // auto* choices = new bool[circuit.inputSize1];
+            auto choices = std::make_unique<bool[]>(circuit.inputSize1);
             for (size_t i {0}; i != circuit.inputSize1; ++i) {
                 const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
                 choices[i] = input[i] ^ wireMasks.masks[wire];
             }
-            ot.recv(inputLabels.data() + circuit.inputSize0, choices, circuit.inputSize1);
+            ot.recv(inputLabels.data() + circuit.inputSize0, choices.get(), static_cast<int64_t>(circuit.inputSize1));
 
             std::vector<BitsetBlock> rawGarblerInput1Masks(calc_bitset_block(circuit.inputSize1));
             io.recv_data(rawGarblerInput1Masks.data(), rawGarblerInput1Masks.size() * sizeof(BitsetBlock));
@@ -141,7 +161,8 @@ namespace ATLab {
                 );
             }
 
-            delete[] choices;
+            check(io, circuit, wireMasks, labels, maskedValues);
+
             return output;
         }
 

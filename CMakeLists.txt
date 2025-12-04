@@ -53,6 +53,7 @@ set(SRC
     src/matrix.cpp
     src/circuit.cpp
     src/garble_evaluate.cpp
+    src/gc_check.cpp
 )
 set(HEADER
     include/socket.hpp
@@ -76,7 +77,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${LIB})
 
 
 if (ENABLE_TEST)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=2)
     FetchContent_Declare(
         googletest
         URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
@@ -107,6 +107,8 @@ if (ENABLE_TEST)
         ${PROJECT_NAME}
         gtest_main
     )
+    target_compile_definitions(${PROJECT_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=2)
+    target_compile_definitions(${TEST_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=2)
 
     file(
         COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests/circuits/
@@ -119,10 +121,11 @@ if (ENABLE_TEST)
 endif (ENABLE_TEST)
 
 if (ENABLE_BENCHMARK)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=1)
     set(BM_SRC
         benchmark/benchmark.cpp
     )
     add_executable(benchmark ${BM_SRC} ${BM_HEADER})
     target_link_libraries(benchmark PRIVATE ${PROJECT_NAME} Boost::program_options)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE PARTY_INSTANCES_PER_THREAD=1)
+    target_compile_definitions(benchmark PRIVATE PARTY_INSTANCES_PER_THREAD=1)
 endif (ENABLE_BENCHMARK)
