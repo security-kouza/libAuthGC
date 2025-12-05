@@ -15,7 +15,7 @@ option(ENABLE_BENCHMARK "Enable benchmark CLI" OFF)
 
 # Dependencies
 # Boost
-set(BOOST_INCLUDE_LIBRARIES asio)
+set(BOOST_INCLUDE_LIBRARIES asio dynamic_bitset)
 if (ENABLE_BENCHMARK)
     set(BOOST_INCLUDE_LIBRARIES ${BOOST_INCLUDE_LIBRARIES} program_options)
 endif (ENABLE_BENCHMARK)
@@ -40,6 +40,7 @@ set(LIB
     emp-ag2pc
     Kyber
     Boost::asio
+    Boost::dynamic_bitset
 )
 set(SRC
     src/socket.cpp
