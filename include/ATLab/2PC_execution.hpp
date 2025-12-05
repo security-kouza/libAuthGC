@@ -67,7 +67,7 @@ namespace ATLab {
             for (size_t i {circuit.inputSize0}; i != circuit.totalInputSize; ++i) {
                 input1masks.push_back(wireMasks.masks[i]);
             }
-            std::vector<BitsetBlock> rawInput1masks {dump_raw_blocks(input1masks)};
+            const std::vector<BitsetBlock> rawInput1masks {dump_raw_blocks(input1masks)};
             io.send_data(rawInput1masks.data(), rawInput1masks.size() * sizeof(BitsetBlock));
             //TODO: macs
 
@@ -76,7 +76,7 @@ namespace ATLab {
             for (size_t i {0}; i != circuit.outputSize; ++i) {
                 outputMasks.push_back(wireMasks.masks[circuit.wireSize - circuit.outputSize + i]);
             }
-            std::vector<BitsetBlock> rawOutputMasks {dump_raw_blocks(outputMasks)};
+            const std::vector<BitsetBlock> rawOutputMasks {dump_raw_blocks(outputMasks)};
             io.send_data(rawOutputMasks.data(), rawOutputMasks.size() * sizeof(BitsetBlock));
 
             check(io, circuit, wireMasks, gc);
@@ -89,7 +89,6 @@ namespace ATLab {
 
             online(io, circuit, gc, wireMasks, std::move(input));
         }
-
 
         inline void full_protocol(emp::NetIO& io, const std::string& circuitFile, const Bitset& input) {
             full_protocol(io, Circuit{circuitFile}, input);
@@ -146,7 +145,7 @@ namespace ATLab {
             };
 
             // Get output masks
-            std::vector<BitsetBlock> rawOutputMasks {calc_bitset_block(circuit.outputSize)};
+            std::vector<BitsetBlock> rawOutputMasks(calc_bitset_block(circuit.outputSize));
             io.recv_data(rawOutputMasks.data(), rawOutputMasks.size() * sizeof(BitsetBlock));
             Bitset outputMasks {rawOutputMasks.begin(), rawOutputMasks.end()};
             outputMasks.resize(circuit.outputSize);

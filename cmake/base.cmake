@@ -79,7 +79,7 @@ else()
 endif()
 
 if(DEBUG)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -g -O0")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -g -O0 -fsanitize=address,undefined")
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native -flto")
 endif()
