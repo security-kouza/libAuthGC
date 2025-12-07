@@ -93,9 +93,8 @@ namespace ATLab::BlockCorrelatedOT {
         std::vector<emp::block> extend(const size_t len) const {
             const size_t otSize {len * _deltaArr.size()};
             std::vector<emp::block> k1Vec(otSize), k2Vec(otSize);
-            auto prg = THE_GLOBAL_PRNG;
             for (auto& k1 : k1Vec) {
-                k1 = as_block(prg());
+                k1 = _mm_set_epi64x(THE_GLOBAL_PRNG(), THE_GLOBAL_PRNG());
             }
             for (size_t i {0}; i != _deltaArr.size(); ++i) {
                 for (size_t j {0}; j != len; ++j) {
