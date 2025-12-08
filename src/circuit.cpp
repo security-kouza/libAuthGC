@@ -54,6 +54,56 @@ namespace ATLab {
 			}
 		}
 #endif // DEBUG
+
+		void map_wires_order_gates (
+			const std::vector<Gate>& gates,
+			std::unordered_map<Wire, size_t>& outputWireToGateIndex,
+			std::vector<size_t>& andGateOrder
+		) {
+			size_t currentAndOrder {0};
+			for (size_t gateIter {0}; gateIter != gates.size(); ++gateIter) {
+				const auto& gate {gates[gateIter]};
+				outputWireToGateIndex[gate.out] = gateIter;
+
+				if (gate.is_and()) {
+					andGateOrder[gateIter] = currentAndOrder;
+					++currentAndOrder;
+				}
+			}
+		}
+
+		void populate_XOR_source_lists(
+			const std::vector<Gate>& gates,
+			std::vector<std::unique_ptr<XORSourceList>>& pXORSourceListVec,
+			const size_t totalInputSize,
+			const size_t wireSize
+		) {
+			for (size_t wireIndex{0}; wireIndex != totalInputSize; ++wireIndex) {
+				pXORSourceListVec[wireIndex] = std::make_unique<XORSourceList>(wireSize, wireIndex);
+			}
+
+			for (size_t gateIter{0}; gateIter != gates.size(); ++gateIter) {
+				const auto& gate{gates[gateIter]};
+				const auto outWire{static_cast<size_t>(gate.out)};
+
+				switch (gate.type) {
+				case Gate::Type::XOR: {
+					pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(
+						*pXORSourceListVec[gate.in0] ^ *pXORSourceListVec[gate.in1]
+					);
+					break;
+				}
+				case Gate::Type::AND: {
+					pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(wireSize, outWire);
+					break;
+				}
+				case Gate::Type::NOT: {
+					pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(~*pXORSourceListVec[gate.in0]);
+					break;
+				}
+				}
+			}
+		}
 	}
 
 	Circuit::Circuit(const std::string& filename) {
@@ -102,36 +152,9 @@ namespace ATLab {
 			}
 		}
 
-		for (size_t wireIndex {0}; wireIndex != totalInputSize; ++wireIndex) {
-			_pXORSourceListVec[wireIndex] = std::make_unique<XORSourceList>(wireSize, wireIndex);
-		}
+		map_wires_order_gates(gates, _outputWireToGateIndex, _andGateOrder);
 
-		size_t currentAndOrder {0};
-		for (size_t gateIter {0}; gateIter != gates.size(); ++gateIter) {
-			const auto& gate {gates[gateIter]};
-
-			_outputWireToGateIndex[gate.out] = gateIter;
-			const auto outWire {static_cast<size_t>(gate.out)};
-
-			switch (gate.type) {
-				case Gate::Type::XOR: {
-					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(
-						*_pXORSourceListVec[gate.in0] ^ *_pXORSourceListVec[gate.in1]
-					);
-					break;
-				}
-				case Gate::Type::AND: {
-					_andGateOrder[gateIter] = currentAndOrder;
-					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(wireSize, outWire);
-					++currentAndOrder;
-					break;
-				}
-				case Gate::Type::NOT: {
-					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(~*_pXORSourceListVec[gate.in0]);
-					break;
-				}
-			}
-		}
+		populate_XOR_source_lists(gates, _pXORSourceListVec, totalInputSize, wireSize);
 
 		// For gc_check
 		_gcCheckData.resize(totalInputSize + andGateSize);
