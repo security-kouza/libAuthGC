@@ -135,11 +135,21 @@ namespace ATLab {
 		// size: independent wires
 		// bitset: [0] for i , [1] for j, set representing the wire is connected
 		std::vector<std::unordered_map<size_t /*gate index*/, std::bitset<2> /*connected*/>> _gcCheckData;
+
+		void _init_gc_check_data ();
+
 	public:
 		static constexpr size_t AND_ORDER_DISABLED {std::numeric_limits<size_t>::max()};
 
-		size_t gateSize {}, wireSize {}, inputSize0 {}, inputSize1 {}, totalInputSize {}, outputSize {};
-		size_t andGateSize {};
+		size_t
+			gateSize {},
+			wireSize {},
+			inputSize0 {},
+			inputSize1 {},
+			totalInputSize {},
+			outputSize {},
+			andGateSize {};
+
 		std::vector<Gate> gates;
 
 		explicit Circuit(const std::string& filename);
@@ -190,6 +200,12 @@ namespace ATLab {
 		auto& gc_check_data(const Wire w) const {
 			const size_t independentIndex {independent_index_map(w)};
 			return _gcCheckData[independentIndex];
+		}
+
+		[[nodiscard]]
+		size_t independent_size() const {
+			static size_t independentSize {andGateSize + totalInputSize};
+			return independentSize;
 		}
 	};
 }

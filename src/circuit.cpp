@@ -106,6 +106,25 @@ namespace ATLab {
 		}
 	}
 
+	void Circuit::_init_gc_check_data() {
+		_gcCheckData.resize(totalInputSize + andGateSize);
+		for (size_t gateIter {0}; gateIter != gateSize; ++gateIter) {
+			const auto& gate {gates[gateIter]};
+			if (!gate.is_and()) {
+				continue;
+			}
+			_pXORSourceListVec[gate.in0]->for_each_wire([gateIter, this](const Wire w) {
+				const size_t independentIndex {independent_index_map(w)};
+				_gcCheckData[independentIndex][gateIter] = std::bitset<2>{1};
+			});
+			_pXORSourceListVec[gate.in1]->for_each_wire([gateIter, this](const Wire w) {
+				const size_t independentIndex {independent_index_map(w)};
+				auto [it, inserted] {_gcCheckData[independentIndex].try_emplace(gateIter, 0)};
+				it->second[1] = true;
+			});
+		}
+	}
+
 	Circuit::Circuit(const std::string& filename) {
 		std::ifstream fin {filename};
 		if (!fin) {
@@ -156,23 +175,7 @@ namespace ATLab {
 
 		populate_XOR_source_lists(gates, _pXORSourceListVec, totalInputSize, wireSize);
 
-		// For gc_check
-		_gcCheckData.resize(totalInputSize + andGateSize);
-		for (size_t gateIter {0}; gateIter != gateSize; ++gateIter) {
-			const auto& gate {gates[gateIter]};
-			if (!gate.is_and()) {
-				continue;
-			}
-			_pXORSourceListVec[gate.in0]->for_each_wire([gateIter, this](const Wire w) {
-				const size_t independentIndex {independent_index_map(w)};
-				_gcCheckData[independentIndex][gateIter] = std::bitset<2>{1};
-			});
-			_pXORSourceListVec[gate.in1]->for_each_wire([gateIter, this](const Wire w) {
-				const size_t independentIndex {independent_index_map(w)};
-				auto [it, inserted] {_gcCheckData[independentIndex].try_emplace(gateIter, 0)};
-				it->second[1] = true;
-			});
-		}
+		_init_gc_check_data();
 	}
 
 	size_t Circuit::and_gate_order(const size_t gateIndex) const {
