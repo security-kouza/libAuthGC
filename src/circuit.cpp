@@ -3,26 +3,58 @@
 #include <sstream>
 #include <fstream>
 #include <limits>
+#include <queue>
 #include <stdexcept>
+#include <unordered_set>
 
 namespace ATLab {
+	namespace {
 #ifdef DEBUG
-	void Circuit::_assert_valid() const {
-		// for each NOT gate, the input wire cannot be an output wire of a NOT gate.
-		for (const auto& gate : gates) {
-			if (gate.type != Gate::Type::NOT) {
-				continue;
+		void assert_no_redundant_not_gate(const Circuit& circuit) {
+			// for each NOT gate, the input wire should have no NOT ancestor until independent wires
+
+			// Mark all input wires checked.
+			std::unordered_set<Wire> checkedWires;
+			for (Wire w {0}; w < static_cast<Wire>(circuit.totalInputSize); ++w) {
+				checkedWires.insert(w);
 			}
-			if (gate.in0 >= static_cast<Wire>(totalInputSize)) {
-				if (const auto& previousGate {gates[gate_index_by_output_wire(gate.in0)]};
-					previousGate.type == Gate::Type::NOT
-				) {
-					throw std::invalid_argument{"Circuit invalid."};
+
+			for (const auto& gate : circuit.gates) {
+				if (gate.type != Gate::Type::NOT) {
+					continue;
 				}
+				const Wire& in {gate.in0};
+				/*
+				 * To avoid recursion, maintain a queue of wires. Initialy only contains `in`.
+				 * Loop until empty:
+				 *   for the next wire popped from the queue,
+				 *     if it's not checked, take its source gate:
+				 *		 assert: The gate must not be a NOT gate.
+				 *		 mark it checked
+				 *		 if XOR: push the input wires into queue.
+				 */
+				std::queue<Wire> wiresToCheck;
+				wiresToCheck.push(in);
+				do {
+					const Wire w {wiresToCheck.front()};
+					wiresToCheck.pop();
+					if (checkedWires.find(w) != checkedWires.end()) {
+						continue;
+					}
+					const Gate& sourceGate {circuit.gates[circuit.gate_index_by_output_wire(w)]};
+					if (sourceGate.type == Gate::Type::NOT) {
+						throw std::invalid_argument{"The circuit contains redundant NOT gates."};
+					}
+					checkedWires.insert(w);
+					if (sourceGate.type == Gate::Type::XOR) {
+						wiresToCheck.push(sourceGate.in0);
+						wiresToCheck.push(sourceGate.in1);
+					}
+				} while (!wiresToCheck.empty());
 			}
 		}
-	}
 #endif // DEBUG
+	}
 
 	Circuit::Circuit(const std::string& filename) {
 		std::ifstream fin {filename};
@@ -100,10 +132,6 @@ namespace ATLab {
 				}
 			}
 		}
-#ifdef DEBUG
-		_assert_valid();
-#endif // DEBUG
-
 
 		// For gc_check
 		_gcCheckData.resize(totalInputSize + andGateSize);
