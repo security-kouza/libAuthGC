@@ -127,7 +127,7 @@ namespace ATLab {
 					break;
 				}
 				case Gate::Type::NOT: {
-					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(*_pXORSourceListVec[gate.in0]);
+					_pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(~*_pXORSourceListVec[gate.in0]);
 					break;
 				}
 			}

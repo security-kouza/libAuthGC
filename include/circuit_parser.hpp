@@ -11,16 +11,27 @@ namespace ATLab {
 	using Wire = int32_t;
 
 	class XORSourceList {
-		Bitset _sources;
+		/**
+		 * all independent wires are in their own positive source.
+		 * After an NOT gate, swap the positive and negative sources
+		 * After an XOR gate, xor the sources respectively
+		 */
+
+		/**
+		 * TODO: save only the independent wires, since Circuit::independent_index_map is implemented
+		 */
+
+		Bitset _sourcesPositive, _sourcesNegative;
 		friend class Circuit;
 
 	public:
 		XORSourceList() = default;
 
 		XORSourceList(const size_t wireSize, const size_t wireIndex):
-			_sources {wireSize}
+			_sourcesPositive {wireSize},
+			_sourcesNegative {wireSize}
 		{
-			_sources.set(wireIndex);
+			_sourcesPositive.set(wireIndex);
 		}
 
 		XORSourceList(const XORSourceList& other) = default;
@@ -31,31 +42,56 @@ namespace ATLab {
 		// Sequential
 		template <typename Callback>
 		void for_each_wire(Callback&& callback) const {
-			for (auto pos {_sources.find_first()}; pos != Bitset::npos; pos = _sources.find_next(pos)) {
+			const Bitset fullSources {_sourcesNegative ^ _sourcesPositive};
+			for (auto pos {fullSources.find_first()}; pos != Bitset::npos; pos = fullSources.find_next(pos)) {
+				callback(static_cast<Wire>(pos));
+			}
+		}
+
+		// Sequential
+		template <typename Callback>
+		void for_each_positive_wire(Callback&& callback) const {
+			for (auto pos {_sourcesPositive.find_first()}; pos != Bitset::npos; pos = _sourcesPositive.find_next(pos)) {
+				callback(static_cast<Wire>(pos));
+			}
+		}
+
+		// Sequential
+		template <typename Callback>
+		void for_each_negative_wire(Callback&& callback) const {
+			for (auto pos {_sourcesNegative.find_first()}; pos != Bitset::npos; pos = _sourcesNegative.find_next(pos)) {
 				callback(static_cast<Wire>(pos));
 			}
 		}
 
 		bool has(const Wire wire) const noexcept {
-			return _sources[wire];
+			return _sourcesPositive[wire] || _sourcesNegative[wire];
 		}
 
 		[[nodiscard]] bool empty() const noexcept {
-			return _sources.none();
+			return _sourcesPositive.none() && _sourcesNegative.none();
 		}
 
 		[[nodiscard]] size_t size() const noexcept {
-			return _sources.size();
+			return _sourcesPositive.size();
 		}
 
 		XORSourceList& operator^=(const XORSourceList& other) {
-			_sources ^= other._sources;
+			_sourcesPositive ^= other._sourcesPositive;
+			_sourcesNegative ^= other._sourcesNegative;
 			return *this;
 		}
 
 		friend XORSourceList operator^(XORSourceList lhs, const XORSourceList& rhs) {
 			lhs ^= rhs;
 			return lhs;
+		}
+
+		friend XORSourceList operator~(XORSourceList list) {
+			list._sourcesPositive ^= list._sourcesNegative;
+			list._sourcesNegative ^= list._sourcesPositive;
+			list._sourcesPositive ^= list._sourcesNegative;
+			return list;
 		}
 	};
 

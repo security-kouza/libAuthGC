@@ -16,7 +16,7 @@ namespace {
 
 TEST(Circuit_Parser, default) {
     EXPECT_NO_THROW(
-        const auto circuit {ATLab::Circuit("circuits/bristol_format/sha-1.txt")};
+        const auto circuit {ATLab::Circuit("circuits/bristol_format/adder_32bit.txt")};
     );
 }
 
