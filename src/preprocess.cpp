@@ -330,7 +330,12 @@ BENCHMARK_END(G step 9);
 
             ITMacBitKeys beaverTripleKeys {io, globalKey.get_COT_sender(), circuit.andGateSize};
 
-            return {std::move(masks), std::move(maskKeys), std::move(beaverTripleShares), std::move(beaverTripleKeys)};
+            return {
+                std::move(masks),
+                std::move(maskKeys),
+                beaverTripleShares.extract_by_global_key(1),
+                std::move(beaverTripleKeys)
+            };
         }
     }
 
@@ -445,7 +450,12 @@ BENCHMARK_END(E step 10)
             // }
             // std::clog << '\n';
 
-            return {std::move(masks), std::move(maskKeys), std::move(authedBeaverTriple), std::move(beaverTripleKeys)};
+            return {
+                std::move(masks),
+                std::move(maskKeys),
+                std::move(authedBeaverTriple),
+                beaverTripleKeys.extract_by_global_key(1)
+            };
         }
     }
 }

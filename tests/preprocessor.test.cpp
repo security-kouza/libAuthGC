@@ -10,8 +10,6 @@
 
 TEST(Preprocess, DEFAULT) {
     const auto circuit {ATLab::Circuit("circuits/bristol_format/adder_32bit.txt")};
-    // const auto circuit {ATLab::Circuit("test/ands.txt")};
-    // const auto circuit {ATLab::Circuit("circuits/bristol_format/AES-non-expanded.txt")};
     std::unique_ptr<ATLab::Garbler::PreprocessedData> pGarblerPreData;
     std::unique_ptr<ATLab::Evaluator::PreprocessedData> pEvaluatorPreData;
 
@@ -37,6 +35,30 @@ TEST(Preprocess, DEFAULT) {
 
     garblerThread.join();
     evaluatorThread.join();
+
+    // ensure the same global key
+    ASSERT_EQ(pGarblerPreData->masks.global_key_size(), 1);
+    ASSERT_EQ(pGarblerPreData->maskKeys.global_key_size(), 1);
+    ASSERT_EQ(pGarblerPreData->beaverTripleShares.global_key_size(), 1);
+    ASSERT_EQ(pGarblerPreData->beaverTripleKeys.global_key_size(), 1);
+
+    ASSERT_EQ(pEvaluatorPreData->masks.global_key_size(), 1);
+    ASSERT_EQ(pEvaluatorPreData->maskKeys.global_key_size(), 1);
+    ASSERT_EQ(pEvaluatorPreData->beaverTripleShares.global_key_size(), 1);
+    ASSERT_EQ(pEvaluatorPreData->beaverTripleKeys.global_key_size(), 1);
+    ASSERT_EQ(
+        ATLab::as_uint128(pGarblerPreData->maskKeys.get_global_key(0)),
+        ATLab::as_uint128(pGarblerPreData->beaverTripleKeys.get_global_key(0))
+    );
+    ASSERT_EQ(
+        ATLab::as_uint128(pEvaluatorPreData->maskKeys.get_global_key(0)),
+        ATLab::as_uint128(pEvaluatorPreData->beaverTripleKeys.get_global_key(0))
+    );
+
+    ASSERT_EQ(pGarblerPreData->beaverTripleShares.size(), circuit.andGateSize);
+    ASSERT_EQ(pEvaluatorPreData->beaverTripleShares.size(), circuit.andGateSize);
+    ASSERT_EQ(pGarblerPreData->beaverTripleKeys.size(), circuit.andGateSize);
+    ASSERT_EQ(pEvaluatorPreData->beaverTripleKeys.size(), circuit.andGateSize);
 
     test_ITMacBits({
         {&pGarblerPreData->masks, &pEvaluatorPreData->maskKeys},

@@ -6,6 +6,24 @@
 #include <stdexcept>
 
 namespace ATLab {
+#ifdef DEBUG
+	void Circuit::_assert_valid() const {
+		// for each NOT gate, the input wire cannot be an output wire of a NOT gate.
+		for (const auto& gate : gates) {
+			if (gate.type != Gate::Type::NOT) {
+				continue;
+			}
+			if (gate.in0 >= static_cast<Wire>(totalInputSize)) {
+				if (const auto& previousGate {gates[gate_index_by_output_wire(gate.in0)]};
+					previousGate.type == Gate::Type::NOT
+				) {
+					throw std::invalid_argument{"Circuit invalid."};
+				}
+			}
+		}
+	}
+#endif // DEBUG
+
 	Circuit::Circuit(const std::string& filename) {
 		std::ifstream fin {filename};
 		if (!fin) {
@@ -82,6 +100,10 @@ namespace ATLab {
 				}
 			}
 		}
+#ifdef DEBUG
+		_assert_valid();
+#endif // DEBUG
+
 
 		// For gc_check
 		_gcCheckData.resize(totalInputSize + andGateSize);

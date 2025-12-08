@@ -197,7 +197,7 @@ namespace ATLab {
          * @param bits Cannot be empty.
          * @param macs Must be a multiple of bits.size()
          */
-        ITMacBits(Bitset&& bits, std::vector<emp::block>&& macs):
+        ITMacBits(Bitset bits, std::vector<emp::block> macs):
             _bits {std::move(bits)},
             _macs {std::move(macs)}
         {
@@ -272,6 +272,17 @@ namespace ATLab {
             return ITMacBlocks{_bits, std::move(_macs), GLOBAL_KEY_SIZE};
         }
 
+        ITMacBits extract_by_global_key(const size_t globalKeyIndex) const {
+            const auto sliceBegin {_macs.cbegin() + globalKeyIndex * size()};
+            const auto sliceEnd {sliceBegin + size()};
+#ifdef DEBUG
+            assert(sliceEnd <= _macs.cend());
+#endif // DEBUG
+            std::vector<emp::block> macSlice {sliceBegin, sliceEnd};
+
+            return ITMacBits{_bits, std::move(macSlice)};
+        }
+
         friend ITMacBits operator*(const Matrix<bool>&, const ITMacBits&);
     };
 
@@ -283,7 +294,7 @@ namespace ATLab {
         ITMacBitKeys() = delete;
         ITMacBitKeys(ITMacBitKeys&&) = default;
 
-        ITMacBitKeys(std::vector<emp::block>&& localKeys, std::vector<emp::block> globalKeys):
+        ITMacBitKeys(std::vector<emp::block> localKeys, std::vector<emp::block> globalKeys):
             _localKeys {std::move(localKeys)},
             _globalKeys {std::move(globalKeys)}
         {
@@ -341,6 +352,7 @@ namespace ATLab {
             delete[] diffArr;
         }
 
+        // size of bits authenticated
         size_t size() const {
             return _localKeys.size() / _globalKeys.size();
         }
@@ -359,6 +371,17 @@ namespace ATLab {
 
         ITMacBlockKeys polyval_to_Blocks() && {
             return ITMacBlockKeys{_localKeys, std::move(_globalKeys)};
+        }
+
+        ITMacBitKeys extract_by_global_key(const size_t globalKeyIndex) const {
+            const auto sliceBegin {_localKeys.cbegin() + globalKeyIndex * size()};
+            const auto sliceEnd {sliceBegin + size()};
+#ifdef DEBUG
+            assert(sliceEnd <= _localKeys.cend());
+#endif // DEBUG
+            std::vector<emp::block> localKeySlice {sliceBegin, sliceEnd};
+
+            return ITMacBitKeys{std::move(localKeySlice), {_globalKeys.at(globalKeyIndex)}};
         }
 
         friend ITMacBitKeys operator*(const Matrix<bool>&, const ITMacBitKeys&);

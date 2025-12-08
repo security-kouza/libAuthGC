@@ -99,6 +99,12 @@ namespace ATLab {
 		// size: independent wires
 		// bitset: [0] for i , [1] for j, set representing the wire is connected
 		std::vector<std::unordered_map<size_t /*gate index*/, std::bitset<2> /*connected*/>> _gcCheckData;
+
+#ifdef DEBUG
+		// this check need the "output wire => gate index" map populated
+		void _assert_valid () const;
+#endif // DEBUG
+
 	public:
 		static constexpr size_t AND_ORDER_DISABLED {std::numeric_limits<size_t>::max()};
 
