@@ -129,6 +129,7 @@ namespace ATLab {
 
 	class Circuit {
 		std::vector<size_t> _andGateOrder;
+		std::vector<size_t> _andToGlobalIndex; // inverse of _andGateOrder
 		std::vector<std::unique_ptr<XORSourceList>> _pXORSourceListVec;
 		std::unordered_map<Wire, size_t> _outputWireToGateIndex;
 

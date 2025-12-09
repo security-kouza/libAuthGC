@@ -58,7 +58,8 @@ namespace ATLab {
 		void map_wires_order_gates (
 			const std::vector<Gate>& gates,
 			std::unordered_map<Wire, size_t>& outputWireToGateIndex,
-			std::vector<size_t>& andGateOrder
+			std::vector<size_t>& andGateOrder,
+			std::vector<size_t>& andToGlobalIndex
 		) {
 			size_t currentAndOrder {0};
 			for (size_t gateIter {0}; gateIter != gates.size(); ++gateIter) {
@@ -67,6 +68,7 @@ namespace ATLab {
 
 				if (gate.is_and()) {
 					andGateOrder[gateIter] = currentAndOrder;
+					andToGlobalIndex[currentAndOrder] = gateIter;
 					++currentAndOrder;
 				}
 			}
@@ -170,8 +172,9 @@ namespace ATLab {
 				gates.emplace_back(in, out, i);
 			}
 		}
+		_andToGlobalIndex.resize(andGateSize);
 
-		map_wires_order_gates(gates, _outputWireToGateIndex, _andGateOrder);
+		map_wires_order_gates(gates, _outputWireToGateIndex, _andGateOrder, _andToGlobalIndex);
 
 		populate_XOR_source_lists(gates, _pXORSourceListVec, totalInputSize, wireSize);
 
