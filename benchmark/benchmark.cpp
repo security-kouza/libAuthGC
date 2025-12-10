@@ -73,10 +73,14 @@ void evaluator(const Circuit& circuit, const std::string& host, const unsigned s
 BENCHMARK_INIT;
 BENCHMARK_START;
     BlockCorrelatedOT::Receiver::Initialize_simple_OT(io);
-    for (size_t i {0}; i != iteration; ++i) {
+    const auto result {Evaluator::online(io, circuit, gc, zeroMasks, Bitset{circuit.inputSize1, 0})};
+    for (size_t i {1}; i != iteration; ++i) {
         Evaluator::online(io, circuit, gc, zeroMasks, Bitset{circuit.inputSize1, 0});
     }
 BENCHMARK_END_ITERATION(evaluator online, iteration);
+    std::string output;
+    to_string(result, output);
+    std::cout << output << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -84,7 +88,10 @@ int main(int argc, char* argv[]) {
     unsigned short port;
     unsigned int iteration;
 
-    po::options_description desc("Options");
+    po::options_description desc {
+        "Benchmark with inputs 0.\n"
+        "Options:"
+    };
     desc.add_options()
         ("help,h", "Show this help message")
         ("phase", po::value(&phase)->default_value("online"), "Execution phase: online|all")
@@ -117,8 +124,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (phase != "online") {
-        std::cerr << "Only supporting online phase\n";
+        std::cerr << "Only supporting online phase.\n";
         return 1;
+    }
+    if (iteration == 0) {
+        std::cerr << "Iteration must be at least 1.\n";
     }
 
     const Circuit circuit {circuitFile};
