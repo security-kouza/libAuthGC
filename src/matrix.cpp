@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <sstream>
+#include <immintrin.h>
 
 #include <boost/dynamic_bitset.hpp>
 
@@ -41,6 +42,37 @@ namespace ATLab {
             }
             return parity;
         }
+
+        [[nodiscard]]
+        bool parity(const uint64_t* const data, const std::size_t count) {
+            __m256i acc{_mm256_setzero_si256()};
+
+            for (size_t i {0}; i + 4 <= count; i += 4) {
+                const __m256i loaded {
+                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(data + i))
+                };
+
+                acc = _mm256_xor_si256(acc, loaded);
+            }
+
+            const __m128i low128 {_mm256_castsi256_si128(acc)};
+            const __m128i high128 {_mm256_extracti128_si256(acc, 1)};
+
+            const __m128i folded128 {_mm_xor_si128(low128, high128)};
+            const __m128i folded64_vec {
+                _mm_xor_si128(folded128, _mm_srli_si128(folded128, 8))
+            };
+
+            auto folded64 {static_cast<uint64_t>(_mm_cvtsi128_si64(folded64_vec))};
+
+            // Remaining
+            for (size_t i {0}; i < count; ++i) {
+                folded64 ^= data[i];
+            }
+
+            return _mm_popcnt_u64(folded64) & 1;
+        }
+
     }
 
     Bitset operator*(const Matrix<bool>& matrix, const Bitset& bits) {
@@ -153,5 +185,29 @@ namespace ATLab {
             newLocalKeys.emplace_back(rowView * keys._localKeys);
         }
         return {std::move(newLocalKeys), keys._globalKeys.front()};
+    }
+
+    bool Matrix<bool>::RowView::bitwise_inner_product(const std::vector<Block64>& bitBlocks) const {
+        if (!_blockCount || !_blocks) {
+            return false;
+        }
+#ifdef DEBUG
+        if (bitBlocks.size() < _blockCount) {
+            std::ostringstream sout;
+            sout << "RowView expects at least " << _blockCount
+                << " parity blocks but received " << bitBlocks.size() << ".\n";
+            throw std::invalid_argument{sout.str()};
+        }
+#endif // DEBUG
+        bool parityBit {false};
+        for (size_t i {0}; i < _blockCount; ++i) {
+            const Block64 mask {_blocks[i] & bitBlocks[i]};
+            parityBit ^= static_cast<bool>(__builtin_popcountll(mask) & 1);
+        }
+        return parityBit;
+    }
+
+    bool Matrix<bool>::RowView::parity() const {
+        return ATLab::parity(_blocks, _blockCount);
     }
 }

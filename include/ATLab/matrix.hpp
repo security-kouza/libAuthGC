@@ -23,6 +23,10 @@ namespace ATLab {
         Storage data;
 
         Matrix() = default;
+        Matrix(const Matrix&) = default;
+        Matrix& operator=(const Matrix&) = default;
+        Matrix(Matrix&&) = default;
+        Matrix& operator=(Matrix&&) = default;
 
         Matrix(size_t rows, size_t cols, Storage storage):
             rowSize {rows},
@@ -52,6 +56,7 @@ namespace ATLab {
         }
     };
 
+
     template<>
     struct Matrix<bool> {
         using Block64 = uint64_t;
@@ -62,7 +67,10 @@ namespace ATLab {
         std::vector<Block64> data;
 
         Matrix() = default;
+        Matrix(const Matrix&) = default;
+        Matrix& operator=(const Matrix&) = default;
         Matrix(Matrix&&) = default;
+        Matrix& operator=(Matrix&&) = default;
 
         Matrix(const size_t rows, const size_t cols, std::vector<Block64> storage):
             rowSize {rows},
@@ -82,7 +90,7 @@ namespace ATLab {
         Matrix(const size_t rows, const size_t cols):
             rowSize {rows},
             colSize {cols},
-            data {Total_block_count(rows, cols), 0}
+            data(Total_block_count(rows, cols), 0)
         {
             // already zero matrix, no need to call zero_matrix_row_padding
         }
@@ -126,15 +134,45 @@ namespace ATLab {
         }
 
         class RowView {
-            const Block64* _blocks;
-            const size_t _blockCount;
-            const size_t _colSize;
+            const Block64* _blocks {nullptr};
+            size_t _blockCount {0};
+            size_t _colSize {0};
         public:
+            RowView() = default;
+
             RowView(const Block64* blocks, const size_t blockCount, const size_t colSize):
                 _blocks {blocks},
                 _blockCount {blockCount},
                 _colSize {colSize}
             {}
+
+            [[nodiscard]]
+            const Block64* data() const noexcept {
+                return _blocks;
+            }
+
+            [[nodiscard]]
+            size_t block_count() const noexcept {
+                return _blockCount;
+            }
+
+            [[nodiscard]]
+            size_t column_size() const noexcept {
+                return _colSize;
+            }
+
+            [[nodiscard]]
+            bool test(const size_t column) const noexcept {
+                if (!_blocks || column >= _colSize) {
+                    return false;
+                }
+                const size_t blockIndex {column / bits_per_block};
+                if (blockIndex >= _blockCount) {
+                    return false;
+                }
+                const size_t bitOffset {column % bits_per_block};
+                return (_blocks[blockIndex] >> bitOffset) & 1ULL;
+            }
 
             template<class Func>
             void for_each_set_bit(Func&& fn) const {
@@ -177,33 +215,19 @@ namespace ATLab {
                 return result;
             }
 
-            bool bitwise_inner_product(const std::vector<Block64>& bitBlocks) const {
-                if (!_blockCount || !_blocks) {
-                    return false;
-                }
-#ifdef DEBUG
-                if (bitBlocks.size() < _blockCount) {
-                    std::ostringstream sout;
-                    sout << "RowView expects at least " << _blockCount
-                         << " parity blocks but received " << bitBlocks.size() << ".\n";
-                    throw std::invalid_argument{sout.str()};
-                }
-#endif // DEBUG
-                bool parityBit {false};
-                for (size_t i {0}; i < _blockCount; ++i) {
-                    const Block64 mask {_blocks[i] & bitBlocks[i]};
-                    parityBit ^= static_cast<bool>(__builtin_popcountll(mask) & 1);
-                }
-                return parityBit;
-            }
+            bool bitwise_inner_product(const std::vector<Block64>& bitBlocks) const;
+
+            bool parity() const;
         };
 
+        [[nodiscard]]
         RowView row(const size_t rowIndex) const {
             const size_t blockPerRow {blocks_per_row()};
             const Block64* rowBlocks {blockPerRow ? row_data(rowIndex) : nullptr};
             return RowView{rowBlocks, blockPerRow, colSize};
         }
 
+        [[nodiscard]]
         bool at(const size_t i, const size_t j) const {
 #ifdef DEBUG
             if (i >= rowSize || j >= colSize) {
