@@ -13,6 +13,7 @@
 namespace {
     using namespace ATLab;
     using namespace std::literals;
+    using ATLab::zero_block;
 
     struct TestVector {
         unsigned long input0, input1, output;
@@ -21,9 +22,13 @@ namespace {
     template <size_t N>
     using TestType = std::array<TestVector, N>;
 
+    struct TestVectorLarge {
+        Bitset input0, input1, output;
+    };
+
     template <size_t N>
     void full_execution_tester(
-        const std::string& circuitFile, TestType<N> tests
+        const std::string& circuitFile, const TestType<N>& tests
     ) {
         const Circuit circuit {circuitFile};
         std::array<Bitset, N> outputs;
@@ -45,6 +50,37 @@ namespace {
 
         for (size_t i {0}; i != N; ++i) {
             EXPECT_EQ(outputs[i].to_ulong(), tests[i].output)
+                << ", where i = " << i << " , circuit = " << circuitFile << '\n';
+        }
+    }
+
+    void full_execution_tester_large(
+        const std::string& circuitFile, const std::vector<TestVectorLarge>& tests
+    ) {
+        const size_t& N {tests.size()};
+
+        const Circuit circuit {circuitFile};
+        std::vector<Bitset> outputs;
+        outputs.reserve(N);
+
+        std::thread garblerThread{[&](){
+            auto& io {server_io()};
+            for (size_t i {0}; i != N; ++i) {
+                Garbler::full_protocol(io, circuit, tests[i].input0);
+            }
+            io.flush();
+        }}, evaluatorThread{[&]() {
+            auto& io {client_io()};
+            for (size_t i {0}; i != N; ++i) {
+                outputs.emplace_back(Evaluator::full_protocol(io, circuit, tests[i].input1));
+            }
+            io.flush();
+        }};
+        garblerThread.join();
+        evaluatorThread.join();
+
+        for (size_t i {0}; i != N; ++i) {
+            EXPECT_EQ(outputs[i], tests[i].output)
                 << ", where i = " << i << " , circuit = " << circuitFile << '\n';
         }
     }
@@ -109,7 +145,7 @@ namespace {
         return result;
     }
 
-    Evaluator::ReceivedGarbledCircuit  gen_zero_gc(const Circuit& circuit) {
+    Evaluator::ReceivedGarbledCircuit gen_zero_gc(const Circuit& circuit) {
         Evaluator::ReceivedGarbledCircuit gc;
 
         std::thread garblerThread{[&](){
@@ -157,17 +193,13 @@ namespace {
         }
     }
 
-    struct TestVectorLarge {
-        Bitset input0, input1, output;
-    };
-
     // For inputs/outputs longer than 64 bits
     void zero_tester_large(
         const std::string& circuitFile,
-        std::vector<TestVectorLarge> tests
+        const std::vector<TestVectorLarge>& tests
     ) {
         const Circuit circuit {circuitFile};
-        Evaluator::ReceivedGarbledCircuit gc {gen_zero_gc(circuit)};
+        const Evaluator::ReceivedGarbledCircuit gc {gen_zero_gc(circuit)};
 
         for (size_t i {0}; i < tests.size(); ++i) {
             EXPECT_EQ(
@@ -233,4 +265,10 @@ TEST(execution, zero_labels) {
 
 TEST(AES, zero_labels) {
     zero_tester_large("circuits/bristol_format/AES-non-expanded.txt", aesTest);
+}
+
+TEST(AES, full_execution) {
+    std::cout << "Testing AES full exectuion. This may take about 1 min...\n";
+    std::cout.flush();
+    full_execution_tester_large("circuits/bristol_format/AES-non-expanded.txt", aesTest);
 }

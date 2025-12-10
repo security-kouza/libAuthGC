@@ -20,16 +20,7 @@ namespace ATLab {
 
         static_assert(STATISTICAL_SECURITY <= 64, "Only generating 64-bit challenge");
 
-        inline std::string block_to_hex(const emp::block& block) {
-            const auto value {as_uint128(block)};
-            std::ostringstream oss;
-            oss << std::hex << std::setfill('0')
-                << std::setw(16) << static_cast<unsigned long long>(value >> 64)
-                << std::setw(16) << static_cast<unsigned long long>(value);
-            return oss.str();
-        }
-
-        inline emp::block sample_challenge_coeff(emp::PRG& prg) {
+        emp::block sample_challenge_coeff(emp::PRG& prg) {
             return _mm_set_epi64x(0, static_cast<long long>(prg()));
         }
     }
@@ -130,7 +121,7 @@ namespace ATLab {
         ) {
             const auto& globalKey {wireMasks.maskKeys.get_global_key(0)};
 
-            const auto challenge {static_cast<uint64_t>(THE_GLOBAL_PRNG())};
+            const uint64_t challenge {THE_GLOBAL_PRNG()};
             io.send_data(&challenge, sizeof(challenge));
             const emp::block challengeSeed {_mm_set_epi64x(0, static_cast<long long>(challenge))};
             emp::PRG chalGen {&challengeSeed};

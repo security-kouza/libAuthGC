@@ -217,7 +217,9 @@ namespace ATLab {
 
             bool bitwise_inner_product(const std::vector<Block64>& bitBlocks) const;
 
-            bool parity() const;
+            bool parity() const noexcept;
+
+            bool empty() const noexcept;
         };
 
         [[nodiscard]]

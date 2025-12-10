@@ -43,12 +43,12 @@ namespace ATLab {
 		{}
 
 		[[nodiscard]]
-		const Matrix<bool>::RowView& positive_row() const noexcept {
+		const Matrix<bool>::RowView& positive_row() const & noexcept {
 			return _positiveRow;
 		}
 
 		[[nodiscard]]
-		const Matrix<bool>::RowView& negative_row() const noexcept {
+		const Matrix<bool>::RowView& negative_row() const & noexcept {
 			return _negativeRow;
 		}
 
@@ -136,21 +136,9 @@ namespace ATLab {
 		Matrix<bool> _positiveMatrix;
 		Matrix<bool> _negativeMatrix;
 
-		void _clear_row(const size_t row) noexcept {
-			const size_t blockCount {_positiveMatrix.blocks_per_row()};
-#ifdef DEBUG
-			assert(blockCount != 0);
-#endif // DEBUG
-			MatrixBlock* positiveRow {_positiveMatrix.row_data(row)};
-			MatrixBlock* negativeRow {_negativeMatrix.row_data(row)};
-			std::fill_n(positiveRow, blockCount, MatrixBlock{0});
-			std::fill_n(negativeRow, blockCount, MatrixBlock{0});
-		}
-
 		void _set_positive_bit(const size_t row, const size_t column) noexcept {
-#ifdef DEBUG
 			assert(row < row_size() && column < col_size());
-#endif // DEBUG
+
 			const size_t blockIndex {column / Matrix<bool>::bits_per_block};
 			const size_t bitOffset {column % Matrix<bool>::bits_per_block};
 			MatrixBlock* rowData {_positiveMatrix.row_data(row)};
@@ -167,21 +155,24 @@ namespace ATLab {
 
 		void set_as_independent_wire(const Wire wire) {
 			const size_t row {static_cast<size_t>(wire)};
-#ifdef DEBUG
 			assert(wire >= 0 && row < row_size());
-#endif // DEBUG
+
 			_set_positive_bit(row, row);
 		}
 
 		void assign_xor(const Wire out, const Wire in0, const Wire in1) {
+			/**
+			 * When both input wires have non-empty negative lists, XOR everything into the positive list.
+			 * Otherwise, XOR the positive and negative lists separately.
+			 */
+			assert(out >= 0 && in0 >= 0 && in1 >= 0);
+
 			const size_t rowOut {static_cast<size_t>(out)};
 			const size_t rowIn0 {static_cast<size_t>(in0)};
 			const size_t rowIn1 {static_cast<size_t>(in1)};
-#ifdef DEBUG
 			const auto& rowSize {row_size()};
-			assert(out >= 0 && in0 >= 0 && in1 >= 0);
 			assert(rowOut < rowSize && rowIn0 < rowSize && rowIn1 < rowSize);
-#endif // DEBUG
+
 			const size_t blockCount {_positiveMatrix.blocks_per_row()};
 			MatrixBlock* outPos {_positiveMatrix.row_data(rowOut)};
 			MatrixBlock* outNeg {_negativeMatrix.row_data(rowOut)};
@@ -189,29 +180,49 @@ namespace ATLab {
 			const MatrixBlock* in1Pos {_positiveMatrix.row_data(rowIn1)};
 			const MatrixBlock* in0Neg {_negativeMatrix.row_data(rowIn0)};
 			const MatrixBlock* in1Neg {_negativeMatrix.row_data(rowIn1)};
+			const auto in0NegRow {_negativeMatrix.row(rowIn0)};
+			const auto in1NegRow {_negativeMatrix.row(rowIn1)};
 
 			for (size_t i {0}; i < blockCount; ++i) {
 				outPos[i] = in0Pos[i] ^ in1Pos[i];
-				outNeg[i] = in0Neg[i] ^ in1Neg[i];
 			}
+
+			if (!in0NegRow.empty() && !in1NegRow.empty()) {
+				for (size_t i {0}; i < blockCount; ++i) {
+					outPos[i] ^= in0Neg[i] ^ in1Neg[i];
+				}
+			} else if (in0NegRow.empty()) {
+				std::memcpy(outNeg, in1Neg, blockCount * sizeof(MatrixBlock));
+			} else if (in1NegRow.empty()) {
+				std::memcpy(outNeg, in0Neg, blockCount * sizeof(MatrixBlock));
+			}
+			// If both empty, do nothing to outNeg to remain all 0
 		}
 
 		void assign_not(const Wire out, const Wire in) {
+			/**
+			 * When the input wire has a non-empty negative list, XOR the two lists into the positive list.
+			 * Otherwise, out' negative list <- in's positive list
+			 */
 			const size_t outRow {static_cast<size_t>(out)};
 			const size_t inRow {static_cast<size_t>(in)};
-#ifdef DEBUG
 			const auto& rowSize {row_size()};
 			assert(out >= 0 && in >= 0);
 			assert(outRow < rowSize && inRow < rowSize);
-#endif // DEBUG
+
 			const size_t blockCount {_positiveMatrix.blocks_per_row()};
 			MatrixBlock* outPos {_positiveMatrix.row_data(outRow)};
 			MatrixBlock* outNeg {_negativeMatrix.row_data(outRow)};
 			const MatrixBlock* inPos {_positiveMatrix.row_data(inRow)};
 			const MatrixBlock* inNeg {_negativeMatrix.row_data(inRow)};
 
-			std::copy_n(inNeg, blockCount, outPos);
-			std::copy_n(inPos, blockCount, outNeg);
+			if (const auto inNegRow {_negativeMatrix.row(inRow)}; inNegRow.empty()) {
+				std::copy_n(inPos, blockCount, outNeg);
+			} else {
+				for (size_t i {0}; i < blockCount; ++i) {
+					outPos[i] = inPos[i] ^ inNeg[i];
+				}
+			}
 		}
 
 		[[nodiscard]]
@@ -319,7 +330,14 @@ namespace ATLab {
 				throw std::out_of_range{sout.str()};
 			}
 #endif // DEBUG
+			assert(it != _outputWireToGateIndex.cend());
 			return it->second;
+		}
+
+		[[nodiscard]]
+		const Gate& gate_by_output_wire(const Wire outputWire) const noexcept {
+			assert(outputWire >= static_cast<Wire>(totalInputSize) && outputWire < static_cast<Wire>(wireSize));
+			return gates[gate_index_by_output_wire(outputWire)];
 		}
 
 		[[nodiscard]]
@@ -356,6 +374,16 @@ namespace ATLab {
 				const Gate& gate {gates[_andToGlobalIndex[i]]};
 				callback(gate, andGateOrder);
 			}
+		}
+
+		[[nodiscard]]
+		bool is_independent(const Wire w) const noexcept {
+			assert(w >= 0 && w < static_cast<Wire>(wireSize));
+
+			if (w < static_cast<Wire>(totalInputSize)) {
+				return true;
+			}
+			return gates[gate_index_by_output_wire(w)].is_and();
 		}
 	};
 }

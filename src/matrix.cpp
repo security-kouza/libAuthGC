@@ -44,10 +44,11 @@ namespace ATLab {
         }
 
         [[nodiscard]]
-        bool parity(const uint64_t* const data, const std::size_t count) {
+        bool parity(const uint64_t* const data, const std::size_t count) noexcept {
             __m256i acc{_mm256_setzero_si256()};
 
-            for (size_t i {0}; i + 4 <= count; i += 4) {
+            size_t i {0};
+            for (; i + 4 <= count; i += 4) {
                 const __m256i loaded {
                     _mm256_loadu_si256(reinterpret_cast<const __m256i*>(data + i))
                 };
@@ -66,13 +67,35 @@ namespace ATLab {
             auto folded64 {static_cast<uint64_t>(_mm_cvtsi128_si64(folded64_vec))};
 
             // Remaining
-            for (size_t i {0}; i < count; ++i) {
+            for (; i < count; ++i) {
                 folded64 ^= data[i];
             }
 
             return _mm_popcnt_u64(folded64) & 1;
         }
 
+        [[nodiscard]]
+        bool is_zero(const uint64_t* const data, const std::size_t count) noexcept {
+            std::size_t i{0};
+
+            for (; i + 4 <= count; i += 4) {
+                const __m256i vec{
+                    _mm256_loadu_si256(reinterpret_cast<const __m256i*>(data + i))
+                };
+
+                if (_mm256_testz_si256(vec, vec) == 0) {
+                    return false;
+                }
+            }
+
+            for (; i < count; ++i) {
+                if (data[i] != 0) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     Bitset operator*(const Matrix<bool>& matrix, const Bitset& bits) {
@@ -207,7 +230,11 @@ namespace ATLab {
         return parityBit;
     }
 
-    bool Matrix<bool>::RowView::parity() const {
+    bool Matrix<bool>::RowView::parity() const noexcept {
         return ATLab::parity(_blocks, _blockCount);
+    }
+
+    bool Matrix<bool>::RowView::empty() const noexcept {
+        return is_zero(_blocks, _blockCount);
     }
 }
