@@ -54,7 +54,7 @@ namespace ATLab {
             std::vector<emp::block> transposedRawMacs; // global key major
             transposedRawMacs.reserve(transposedRow * transposedCol);
 
-            // transpose rawMacs to _transposedRawMacs, ignoring the last row in rawMacs
+            // Transpose rawMacs to _transposedRawMacs, ignoring the last row in rawMacs.
             // rawMacs is a flatted matrix, with `compressParam` rows, `totalIndependent` columns
             for (size_t i = 0; i < transposedRow; ++i) {
                 for (size_t j = 0; j < transposedCol; ++j) {
@@ -148,7 +148,7 @@ namespace ATLab {
 
         emp::block operator()(const Wire in0, const Wire in1) const {
             emp::block res {_mm_set_epi64x(0, 0)};
-            const auto& xorSource1 {_circuit.xor_source_list(in1)};
+            const auto xorSource1 {_circuit.xor_source_list(in1)};
             _circuit.xor_source_list(in0).for_each_wire([this, &xorSource1, &res](const Wire i) {
                 xorSource1.for_each_wire([this, &res, i](const Wire j) {
                     xor_to(res, from_cache(i, j));

@@ -1,97 +1,236 @@
 #ifndef ATLab_CIRCUIT_PARSER_HPP
 #define ATLab_CIRCUIT_PARSER_HPP
 
+#include <algorithm>
 #include <limits>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "utils.hpp"
+#include "ATLab/matrix.hpp"
+
 
 namespace ATLab {
 	using Wire = int32_t;
 
 	class XORSourceList {
-		/**
-		 * all independent wires are in their own positive source.
-		 * After an NOT gate, swap the positive and negative sources
-		 * After an XOR gate, xor the sources respectively
-		 */
+		Matrix<bool>::RowView _positiveRow;
+		Matrix<bool>::RowView _negativeRow;
 
-		/**
-		 * TODO: save only the independent wires, since Circuit::independent_index_map is implemented
-		 */
+		[[nodiscard]]
+		size_t _block_count() const noexcept {
+			return _positiveRow.block_count();
+		}
 
-		Bitset _sourcesPositive, _sourcesNegative;
-		friend class Circuit;
+		template <typename Callback>
+		static void For_each_set_bit_(const Matrix<bool>::RowView& row, Callback&& callback) {
+			row.for_each_set_bit([&](const size_t col) {
+				callback(static_cast<Wire>(col));
+			});
+		}
 
 	public:
 		XORSourceList() = default;
 
-		XORSourceList(const size_t wireSize, const size_t wireIndex):
-			_sourcesPositive {wireSize},
-			_sourcesNegative {wireSize}
-		{
-			_sourcesPositive.set(wireIndex);
+		XORSourceList(
+			Matrix<bool>::RowView positiveRow,
+			Matrix<bool>::RowView negativeRow
+		) noexcept:
+			_positiveRow {std::move(positiveRow)},
+			_negativeRow {std::move(negativeRow)}
+		{}
+
+		[[nodiscard]]
+		const Matrix<bool>::RowView& positive_row() const noexcept {
+			return _positiveRow;
 		}
 
-		XORSourceList(const XORSourceList& other) = default;
-		XORSourceList(XORSourceList&& other) noexcept = default;
-		XORSourceList& operator=(const XORSourceList& other) = default;
-		XORSourceList& operator=(XORSourceList&& other) noexcept = default;
+		[[nodiscard]]
+		const Matrix<bool>::RowView& negative_row() const noexcept {
+			return _negativeRow;
+		}
+
 
 		// Sequential
 		template <typename Callback>
 		void for_each_wire(Callback&& callback) const {
-			const Bitset fullSources {_sourcesNegative ^ _sourcesPositive};
-			for (auto pos {fullSources.find_first()}; pos != Bitset::npos; pos = fullSources.find_next(pos)) {
-				callback(static_cast<Wire>(pos));
+			const auto blockCount {_block_count()};
+			if (!blockCount) {
+				return;
+			}
+			const MatrixBlock* positiveRowData {_positiveRow.data()};
+			const MatrixBlock* negativeRowData {_negativeRow.data()};
+			if (!positiveRowData || !negativeRowData) {
+				return;
+			}
+			const size_t colSize {_positiveRow.column_size()};
+			for (size_t blockIter {0}; blockIter < blockCount; ++blockIter) {
+				MatrixBlock mask {positiveRowData[blockIter] ^ negativeRowData[blockIter]};
+				while (mask) {
+					const size_t bitOffset {static_cast<size_t>(__builtin_ctzll(mask))};
+					mask &= (mask - 1);
+					const size_t col {blockIter * Matrix<bool>::bits_per_block + bitOffset};
+					if (col >= colSize) {
+						break;
+					}
+					callback(static_cast<Wire>(col));
+				}
 			}
 		}
 
 		// Sequential
 		template <typename Callback>
 		void for_each_positive_wire(Callback&& callback) const {
-			for (auto pos {_sourcesPositive.find_first()}; pos != Bitset::npos; pos = _sourcesPositive.find_next(pos)) {
-				callback(static_cast<Wire>(pos));
-			}
+			For_each_set_bit_(_positiveRow, std::forward<Callback>(callback));
 		}
 
 		// Sequential
 		template <typename Callback>
 		void for_each_negative_wire(Callback&& callback) const {
-			for (auto pos {_sourcesNegative.find_first()}; pos != Bitset::npos; pos = _sourcesNegative.find_next(pos)) {
-				callback(static_cast<Wire>(pos));
+			For_each_set_bit_(_negativeRow, std::forward<Callback>(callback));
+		}
+
+		bool has(const Wire wire) const {
+#ifdef DEBUG
+			if (wire < 0) {
+				std::ostringstream sout;
+				sout << "Accessing invalid wire " << wire << ".\n";
+				throw std::invalid_argument{sout.str()};
+			}
+#endif // DEBUG
+			const size_t column {static_cast<size_t>(wire)};
+			return _positiveRow.test(column) || _negativeRow.test(column);
+		}
+
+		[[nodiscard]]
+		bool empty() const noexcept {
+			const auto blockCount {_block_count()};
+			if (!blockCount) {
+				return true;
+			}
+			const MatrixBlock* positiveRowData {_positiveRow.data()};
+			const MatrixBlock* negativeRowData {_negativeRow.data()};
+			if (!positiveRowData || !negativeRowData) {
+				return true;
+			}
+			for (size_t blockIter {0}; blockIter < blockCount; ++blockIter) {
+				if (positiveRowData[blockIter] || negativeRowData[blockIter]) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		[[nodiscard]]
+		size_t size() const noexcept {
+			return _positiveRow.column_size();
+		}
+	};
+
+	class XORSourceMatrix {
+		friend class Circuit;
+		using MatrixBlock = Matrix<bool>::Block64;
+
+		Matrix<bool> _positiveMatrix;
+		Matrix<bool> _negativeMatrix;
+
+		void _clear_row(const size_t row) noexcept {
+			const size_t blockCount {_positiveMatrix.blocks_per_row()};
+#ifdef DEBUG
+			assert(blockCount != 0);
+#endif // DEBUG
+			MatrixBlock* positiveRow {_positiveMatrix.row_data(row)};
+			MatrixBlock* negativeRow {_negativeMatrix.row_data(row)};
+			std::fill_n(positiveRow, blockCount, MatrixBlock{0});
+			std::fill_n(negativeRow, blockCount, MatrixBlock{0});
+		}
+
+		void _set_positive_bit(const size_t row, const size_t column) noexcept {
+#ifdef DEBUG
+			assert(row < row_size() && column < col_size());
+#endif // DEBUG
+			const size_t blockIndex {column / Matrix<bool>::bits_per_block};
+			const size_t bitOffset {column % Matrix<bool>::bits_per_block};
+			MatrixBlock* rowData {_positiveMatrix.row_data(row)};
+			rowData[blockIndex] |= (MatrixBlock{1} << bitOffset);
+		}
+
+		void _initialize(const size_t wireSize) {
+			_positiveMatrix = Matrix<bool>{wireSize, wireSize};
+			_negativeMatrix = Matrix<bool>{wireSize, wireSize};
+		}
+
+	public:
+		XORSourceMatrix() = default;
+
+		void set_as_independent_wire(const Wire wire) {
+			const size_t row {static_cast<size_t>(wire)};
+#ifdef DEBUG
+			assert(wire >= 0 && row < row_size());
+#endif // DEBUG
+			_set_positive_bit(row, row);
+		}
+
+		void assign_xor(const Wire out, const Wire in0, const Wire in1) {
+			const size_t rowOut {static_cast<size_t>(out)};
+			const size_t rowIn0 {static_cast<size_t>(in0)};
+			const size_t rowIn1 {static_cast<size_t>(in1)};
+#ifdef DEBUG
+			const auto& rowSize {row_size()};
+			assert(out >= 0 && in0 >= 0 && in1 >= 0);
+			assert(rowOut < rowSize && rowIn0 < rowSize && rowIn1 < rowSize);
+#endif // DEBUG
+			const size_t blockCount {_positiveMatrix.blocks_per_row()};
+			MatrixBlock* outPos {_positiveMatrix.row_data(rowOut)};
+			MatrixBlock* outNeg {_negativeMatrix.row_data(rowOut)};
+			const MatrixBlock* in0Pos {_positiveMatrix.row_data(rowIn0)};
+			const MatrixBlock* in1Pos {_positiveMatrix.row_data(rowIn1)};
+			const MatrixBlock* in0Neg {_negativeMatrix.row_data(rowIn0)};
+			const MatrixBlock* in1Neg {_negativeMatrix.row_data(rowIn1)};
+
+			for (size_t i {0}; i < blockCount; ++i) {
+				outPos[i] = in0Pos[i] ^ in1Pos[i];
+				outNeg[i] = in0Neg[i] ^ in1Neg[i];
 			}
 		}
 
-		bool has(const Wire wire) const noexcept {
-			return _sourcesPositive[wire] || _sourcesNegative[wire];
+		void assign_not(const Wire out, const Wire in) {
+			const size_t outRow {static_cast<size_t>(out)};
+			const size_t inRow {static_cast<size_t>(in)};
+#ifdef DEBUG
+			const auto& rowSize {row_size()};
+			assert(out >= 0 && in >= 0);
+			assert(outRow < rowSize && inRow < rowSize);
+#endif // DEBUG
+			const size_t blockCount {_positiveMatrix.blocks_per_row()};
+			MatrixBlock* outPos {_positiveMatrix.row_data(outRow)};
+			MatrixBlock* outNeg {_negativeMatrix.row_data(outRow)};
+			const MatrixBlock* inPos {_positiveMatrix.row_data(inRow)};
+			const MatrixBlock* inNeg {_negativeMatrix.row_data(inRow)};
+
+			std::copy_n(inNeg, blockCount, outPos);
+			std::copy_n(inPos, blockCount, outNeg);
 		}
 
-		[[nodiscard]] bool empty() const noexcept {
-			return _sourcesPositive.none() && _sourcesNegative.none();
+		[[nodiscard]]
+		XORSourceList row(const Wire wire) const noexcept {
+			const size_t rowIndex {static_cast<size_t>(wire)};
+#ifdef DEBUG
+			assert(wire >= 0 && rowIndex < row_size());
+#endif // DEBUG
+			return XORSourceList{_positiveMatrix.row(rowIndex), _negativeMatrix.row(rowIndex)};
 		}
 
-		[[nodiscard]] size_t size() const noexcept {
-			return _sourcesPositive.size();
+		[[nodiscard]]
+		size_t row_size() const noexcept {
+			return _positiveMatrix.rowSize;
 		}
 
-		XORSourceList& operator^=(const XORSourceList& other) {
-			_sourcesPositive ^= other._sourcesPositive;
-			_sourcesNegative ^= other._sourcesNegative;
-			return *this;
-		}
-
-		friend XORSourceList operator^(XORSourceList lhs, const XORSourceList& rhs) {
-			lhs ^= rhs;
-			return lhs;
-		}
-
-		friend XORSourceList operator~(XORSourceList list) {
-			list._sourcesPositive ^= list._sourcesNegative;
-			list._sourcesNegative ^= list._sourcesPositive;
-			list._sourcesPositive ^= list._sourcesNegative;
-			return list;
+		[[nodiscard]]
+		size_t col_size() const noexcept {
+			return _positiveMatrix.colSize;
 		}
 	};
 
@@ -122,7 +261,8 @@ namespace ATLab {
 			index {index}
 		{}
 
-		[[nodiscard]] bool is_and() const noexcept {
+		[[nodiscard]]
+		bool is_and() const noexcept {
 			return type == Type::AND;
 		}
 	};
@@ -130,7 +270,7 @@ namespace ATLab {
 	class Circuit {
 		std::vector<size_t> _andGateOrder;
 		std::vector<size_t> _andToGlobalIndex; // inverse of _andGateOrder
-		std::vector<std::unique_ptr<XORSourceList>> _pXORSourceListVec;
+		XORSourceMatrix _xorSourceMatrix;
 		std::unordered_map<Wire, size_t> _outputWireToGateIndex;
 
 		// size: independent wires
@@ -164,9 +304,10 @@ namespace ATLab {
 		}
 
 		[[nodiscard]]
-		const XORSourceList& xor_source_list(const Wire wire) const {
-			return *_pXORSourceListVec[wire];
+		XORSourceList xor_source_list(const Wire wire) const {
+			return _xorSourceMatrix.row(wire);
 		}
+
 
 		[[nodiscard]]
 		size_t gate_index_by_output_wire(const Wire outputWire) const {
@@ -205,8 +346,16 @@ namespace ATLab {
 
 		[[nodiscard]]
 		size_t independent_size() const {
-			static size_t independentSize {andGateSize + totalInputSize};
-			return independentSize;
+			return andGateSize + totalInputSize;
+		}
+
+		template <typename Callback>
+		void for_each_AND_gate(Callback&& callback) const {
+			for (size_t i {0}; i != _andToGlobalIndex.size(); ++i) {
+				const size_t& andGateOrder {i};
+				const Gate& gate {gates[_andToGlobalIndex[i]]};
+				callback(gate, andGateOrder);
+			}
 		}
 	};
 }

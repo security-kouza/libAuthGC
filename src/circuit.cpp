@@ -6,6 +6,7 @@
 #include <queue>
 #include <stdexcept>
 #include <unordered_set>
+#include <algorithm>
 
 namespace ATLab {
 	namespace {
@@ -74,35 +75,28 @@ namespace ATLab {
 			}
 		}
 
-		void populate_XOR_source_lists(
+		void populate_XOR_source_matrix(
 			const std::vector<Gate>& gates,
-			std::vector<std::unique_ptr<XORSourceList>>& pXORSourceListVec,
+			XORSourceMatrix& xorSourceMatrix,
 			const size_t totalInputSize,
 			const size_t wireSize
 		) {
-			for (size_t wireIndex{0}; wireIndex != totalInputSize; ++wireIndex) {
-				pXORSourceListVec[wireIndex] = std::make_unique<XORSourceList>(wireSize, wireIndex);
+			const size_t inputInitLimit {std::min(totalInputSize, wireSize)};
+			for (size_t wireIndex {0}; wireIndex != inputInitLimit; ++wireIndex) {
+				xorSourceMatrix.set_as_independent_wire(static_cast<Wire>(wireIndex));
 			}
 
-			for (size_t gateIter{0}; gateIter != gates.size(); ++gateIter) {
-				const auto& gate{gates[gateIter]};
-				const auto outWire{static_cast<size_t>(gate.out)};
-
+			for (const auto& gate : gates) {
 				switch (gate.type) {
-				case Gate::Type::XOR: {
-					pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(
-						*pXORSourceListVec[gate.in0] ^ *pXORSourceListVec[gate.in1]
-					);
+				case Gate::Type::XOR:
+					xorSourceMatrix.assign_xor(gate.out, gate.in0, gate.in1);
 					break;
-				}
-				case Gate::Type::AND: {
-					pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(wireSize, outWire);
+				case Gate::Type::AND:
+					xorSourceMatrix.set_as_independent_wire(gate.out);
 					break;
-				}
-				case Gate::Type::NOT: {
-					pXORSourceListVec[outWire] = std::make_unique<XORSourceList>(~*pXORSourceListVec[gate.in0]);
+				case Gate::Type::NOT:
+					xorSourceMatrix.assign_not(gate.out, gate.in0);
 					break;
-				}
 				}
 			}
 		}
@@ -115,11 +109,11 @@ namespace ATLab {
 			if (!gate.is_and()) {
 				continue;
 			}
-			_pXORSourceListVec[gate.in0]->for_each_wire([gateIter, this](const Wire w) {
+			xor_source_list(gate.in0).for_each_wire([gateIter, this](const Wire w) {
 				const size_t independentIndex {independent_index_map(w)};
 				_gcCheckData[independentIndex][gateIter] = std::bitset<2>{1};
 			});
-			_pXORSourceListVec[gate.in1]->for_each_wire([gateIter, this](const Wire w) {
+			xor_source_list(gate.in1).for_each_wire([gateIter, this](const Wire w) {
 				const size_t independentIndex {independent_index_map(w)};
 				auto [it, inserted] {_gcCheckData[independentIndex].try_emplace(gateIter, 0)};
 				it->second[1] = true;
@@ -136,7 +130,7 @@ namespace ATLab {
 		fin >> gateSize >> wireSize;
 		gates.reserve(gateSize);
 		_andGateOrder.resize(gateSize, AND_ORDER_DISABLED);
-		_pXORSourceListVec.resize(wireSize);
+		_xorSourceMatrix._initialize(wireSize);
 		_outputWireToGateIndex.reserve(gateSize);
 
 		fin >> inputSize0 >> inputSize1 >> outputSize;
@@ -176,14 +170,19 @@ namespace ATLab {
 
 		map_wires_order_gates(gates, _outputWireToGateIndex, _andGateOrder, _andToGlobalIndex);
 
-		populate_XOR_source_lists(gates, _pXORSourceListVec, totalInputSize, wireSize);
+		populate_XOR_source_matrix(
+			gates,
+			_xorSourceMatrix,
+			totalInputSize,
+			wireSize
+		);
 
 		_init_gc_check_data();
 	}
 
 	size_t Circuit::and_gate_order(const size_t gateIndex) const {
 #ifdef DEBUG
-		if (gateIndex >= _andGateOrder.size()) {
+		if (gateIndex >= gateSize) {
 			std::ostringstream sout;
 			sout << "Accessing gate index " << gateIndex << ", but only " << gateSize << " gates exist.\n";
 			throw std::out_of_range{sout.str()};
@@ -191,11 +190,10 @@ namespace ATLab {
 		if (gates[gateIndex].type != Gate::Type::AND) {
 			const std::string gateType {gates[gateIndex].type == Gate::Type::XOR ? "an XOR" : "a NOT"};
 			std::ostringstream sout;
-			sout << "Gate " << gateIndex << " is not an AND gate, but " << gateType << " Gate.\n";
+			sout << "Gate " << gateIndex << " is not an AND gate, but " << gateType << " gate.\n";
 			throw std::runtime_error{sout.str()};
 		}
 #endif // DEBUG
-		const auto andGateOrder {_andGateOrder[gateIndex]};
-		return andGateOrder;
+		return _andGateOrder[gateIndex];
 	}
 }

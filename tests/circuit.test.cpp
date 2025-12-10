@@ -67,7 +67,9 @@ TEST(Circuit_Parser, populates_metadata_for_simple_circuit) {
 
     EXPECT_EQ(circuit.and_gate_order(3), 0);
     EXPECT_EQ(circuit.and_gate_order(5), 1);
+#ifdef DEBUG
     EXPECT_THROW(auto res {circuit.and_gate_order(4)}, std::exception);
+#endif // DEBUG
 }
 
 TEST(Circuit_Parser, gc_check_data) {
