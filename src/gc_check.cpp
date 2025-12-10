@@ -23,6 +23,23 @@ namespace ATLab {
         emp::block sample_challenge_coeff(emp::PRG& prg) {
             return _mm_set_epi64x(0, static_cast<long long>(prg()));
         }
+
+        emp::block calc_flip_mac_term(
+            const Circuit& circuit,
+            const Wire i,
+            const Wire j,
+            const emp::block& mac0,
+            const emp::block mac1
+        ) {
+            emp::block sum {zero_block()};
+            if (circuit.xor_source_list(i).test_flip()) {
+                xor_to(sum, mac1);
+            }
+            if (circuit.xor_source_list(j).test_flip()) {
+                xor_to(sum, mac0);
+            }
+            return sum;
+        }
     }
 
     namespace Garbler {
@@ -99,6 +116,15 @@ namespace ATLab {
                     wireMasks.masks.get_mac(0, gate.out),
                     wireMasks.beaverTripleShares.get_mac(0, andGateIter)
                 )};
+
+                xor_to(ak0, calc_flip_mac_term(
+                    circuit,
+                    gate.in0,
+                    gate.in1,
+                    wireMasks.masks.get_mac(0, gate.in0),
+                    wireMasks.masks.get_mac(0, gate.in1)
+                ));
+
                 ak0Terms.push_back(ak0);
                 ++andGateIter;
             }
