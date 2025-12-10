@@ -74,32 +74,6 @@ namespace ATLab {
 				}
 			}
 		}
-
-		void populate_XOR_source_matrix(
-			const std::vector<Gate>& gates,
-			XORSourceMatrix& xorSourceMatrix,
-			const size_t totalInputSize,
-			const size_t wireSize
-		) {
-			const size_t inputInitLimit {std::min(totalInputSize, wireSize)};
-			for (size_t wireIndex {0}; wireIndex != inputInitLimit; ++wireIndex) {
-				xorSourceMatrix.set_as_independent_wire(static_cast<Wire>(wireIndex));
-			}
-
-			for (const auto& gate : gates) {
-				switch (gate.type) {
-				case Gate::Type::XOR:
-					xorSourceMatrix.assign_xor(gate.out, gate.in0, gate.in1);
-					break;
-				case Gate::Type::AND:
-					xorSourceMatrix.set_as_independent_wire(gate.out);
-					break;
-				case Gate::Type::NOT:
-					xorSourceMatrix.assign_not(gate.out, gate.in0);
-					break;
-				}
-			}
-		}
 	}
 
 	void Circuit::_init_gc_check_data() {
@@ -118,6 +92,28 @@ namespace ATLab {
 				auto [it, inserted] {_gcCheckData[independentIndex].try_emplace(gateIter, 0)};
 				it->second[1] = true;
 			});
+		}
+	}
+
+	void Circuit::Populate_XOR_source_matrix_(const std::vector<Gate>& gates, XORSourceMatrix& xorSourceMatrix,
+		const size_t totalInputSize, const size_t wireSize) {
+		const size_t inputInitLimit {std::min(totalInputSize, wireSize)};
+		for (size_t wireIndex {0}; wireIndex != inputInitLimit; ++wireIndex) {
+			xorSourceMatrix.set_as_independent_wire(static_cast<Wire>(wireIndex));
+		}
+
+		for (const auto& gate : gates) {
+			switch (gate.type) {
+			case Gate::Type::XOR:
+				xorSourceMatrix._assign_xor(gate.out, gate.in0, gate.in1);
+				break;
+			case Gate::Type::AND:
+				xorSourceMatrix.set_as_independent_wire(gate.out);
+				break;
+			case Gate::Type::NOT:
+				xorSourceMatrix._assign_not(gate.out, gate.in0);
+				break;
+			}
 		}
 	}
 
@@ -170,7 +166,7 @@ namespace ATLab {
 
 		map_wires_order_gates(gates, _outputWireToGateIndex, _andGateOrder, _andToGlobalIndex);
 
-		populate_XOR_source_matrix(
+		Populate_XOR_source_matrix_(
 			gates,
 			_xorSourceMatrix,
 			totalInputSize,
