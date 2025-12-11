@@ -54,6 +54,7 @@ set(SRC
     src/matrix.cpp
     src/circuit.cpp
     src/garble_evaluate.cpp
+    src/2PC_execution.cpp
     src/gc_check.cpp
 )
 set(HEADER

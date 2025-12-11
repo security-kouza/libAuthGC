@@ -19,68 +19,13 @@ namespace ATLab {
             const GarbledCircuit& gc
         );
 
-        inline void online(
+        void online(
             emp::NetIO& io,
             const Circuit& circuit,
             const GarbledCircuit& gc,
             const PreprocessedData& wireMasks,
             const Bitset& input
-        ) {
-            Bitset maskedValues;
-            maskedValues.reserve(circuit.inputSize0);
-            for (size_t w {0}; w != circuit.inputSize0; ++w) {
-                maskedValues.push_back(input[w] ^ wireMasks.masks[w]);
-            }
-
-            const std::vector<BitsetBlock> rawMaskedValues {dump_raw_blocks(maskedValues)};
-            io.send_data(rawMaskedValues.data(), rawMaskedValues.size() * sizeof(BitsetBlock));
-
-            std::vector<emp::block> garblerInputLabels;
-            garblerInputLabels.reserve(circuit.inputSize0);
-            for (size_t w {0}; w != circuit.inputSize0; ++w) {
-                garblerInputLabels.push_back(maskedValues[w] ? gc.label1[w] : gc.label0[w]);
-            }
-            io.send_data(garblerInputLabels.data(), garblerInputLabels.size() * sizeof(emp::block));
-
-            // send labels for evaluator's inputs
-            BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Sender::Get_simple_OT(io.role)};
-            std::vector<emp::block> evaluatorLabel0(circuit.inputSize1);
-            std::vector<emp::block> evaluatorLabel1(circuit.inputSize1);
-            for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
-                const bool garblerMaskShare {wireMasks.masks[wire]};
-                const auto& labelZero {gc.label0[wire]};
-                const auto& labelOne {gc.label1[wire]};
-                if (garblerMaskShare) {
-                    evaluatorLabel0[i] = labelOne;
-                    evaluatorLabel1[i] = labelZero;
-                } else {
-                    evaluatorLabel0[i] = labelZero;
-                    evaluatorLabel1[i] = labelOne;
-                }
-            }
-            ot.send(evaluatorLabel0.data(), evaluatorLabel1.data(), circuit.inputSize1);
-
-            // send masked values for evaluator's inputs
-            Bitset input1masks;
-            input1masks.reserve(circuit.inputSize1);
-            for (size_t i {circuit.inputSize0}; i != circuit.totalInputSize; ++i) {
-                input1masks.push_back(wireMasks.masks[i]);
-            }
-            const std::vector<BitsetBlock> rawInput1masks {dump_raw_blocks(input1masks)};
-            io.send_data(rawInput1masks.data(), rawInput1masks.size() * sizeof(BitsetBlock));
-            //TODO: macs
-
-            Bitset outputMasks;
-            outputMasks.reserve(circuit.outputSize);
-            for (size_t i {0}; i != circuit.outputSize; ++i) {
-                outputMasks.push_back(wireMasks.masks[circuit.wireSize - circuit.outputSize + i]);
-            }
-            const std::vector<BitsetBlock> rawOutputMasks {dump_raw_blocks(outputMasks)};
-            io.send_data(rawOutputMasks.data(), rawOutputMasks.size() * sizeof(BitsetBlock));
-
-            check(io, circuit, wireMasks, gc);
-        }
+        );
 
         inline void full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
             input.resize(circuit.inputSize0);
@@ -106,64 +51,13 @@ namespace ATLab {
         );
 
         [[nodiscard]]
-        inline Bitset online(
+        Bitset online(
             emp::NetIO& io,
             const Circuit& circuit,
             const ReceivedGarbledCircuit& gc,
             const PreprocessedData& wireMasks,
             Bitset input
-        ) {
-            // online
-            std::vector<BitsetBlock> rawMaskedValues(calc_bitset_block(circuit.inputSize0));
-            io.recv_data(rawMaskedValues.data(), rawMaskedValues.size() * sizeof(BitsetBlock));
-            Bitset inputMaskedValues {rawMaskedValues.begin(), rawMaskedValues.end()};
-            inputMaskedValues.resize(circuit.inputSize0);
-            inputMaskedValues.reserve(circuit.wireSize);
-
-            std::vector<emp::block> inputLabels(circuit.totalInputSize);
-            io.recv_data(inputLabels.data(), circuit.inputSize0 * sizeof(emp::block));
-
-            BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Receiver::Get_simple_OT(io.role)};
-            // auto* choices = new bool[circuit.inputSize1];
-            auto choices = std::make_unique<bool[]>(circuit.inputSize1);
-            for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
-                choices[i] = input[i] ^ wireMasks.masks[wire];
-            }
-            ot.recv(inputLabels.data() + circuit.inputSize0, choices.get(), static_cast<int64_t>(circuit.inputSize1));
-
-            std::vector<BitsetBlock> rawGarblerInput1Masks(calc_bitset_block(circuit.inputSize1));
-            io.recv_data(rawGarblerInput1Masks.data(), rawGarblerInput1Masks.size() * sizeof(BitsetBlock));
-            Bitset garblerInput1Masks {rawGarblerInput1Masks.begin(), rawGarblerInput1Masks.end()};
-            garblerInput1Masks.resize(circuit.inputSize1);
-            for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                inputMaskedValues.push_back(choices[i] ^ garblerInput1Masks[i]);
-            }
-
-            const auto& [maskedValues, labels] {
-                evaluate(circuit, wireMasks, gc, std::move(inputLabels), std::move(inputMaskedValues))
-            };
-
-            // Get output masks
-            std::vector<BitsetBlock> rawOutputMasks(calc_bitset_block(circuit.outputSize));
-            io.recv_data(rawOutputMasks.data(), rawOutputMasks.size() * sizeof(BitsetBlock));
-            Bitset outputMasks {rawOutputMasks.begin(), rawOutputMasks.end()};
-            outputMasks.resize(circuit.outputSize);
-
-            Bitset output;
-            output.reserve(circuit.outputSize);
-            for (size_t i {0}; i != circuit.outputSize; ++i) {
-                output.push_back(
-                    maskedValues[circuit.wireSize - circuit.outputSize + i] ^
-                    outputMasks[i] ^
-                    wireMasks.masks[circuit.wireSize - circuit.outputSize + i]
-                );
-            }
-
-            check(io, circuit, wireMasks, labels, maskedValues);
-
-            return output;
-        }
+        );
 
         [[nodiscard]]
         inline Bitset full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
