@@ -44,10 +44,31 @@ namespace {
             ITMacBitKeys{std::move(beaverKeys), {delta}}
         };
     }
+
+    void rtt_test(emp::NetIO& io) {
+        constexpr int N = 1000;
+        const auto start = std::chrono::high_resolution_clock::now();
+        for(int i = 0; i < N; ++i) {
+            if(io.role == emp::NetIO::SERVER) {
+                io.send_data("x", 1);
+                char buf[1];
+                io.recv_data(buf, 1);
+            } else {
+                char buf[1];
+                io.recv_data(buf, 1);
+                io.send_data("y", 1);
+            }
+        }
+        const auto end = std::chrono::high_resolution_clock::now();
+        const double avg_rtt = std::chrono::duration<double, std::milli>(end - start).count() / N;
+        std::cout << "Average RTT: " << avg_rtt << " ms" << std::endl;
+    }
 }
 
 void garbler(const Circuit& circuit, const std::string& host, const unsigned short port, const size_t iteration) {
     emp::NetIO io {emp::NetIO::SERVER, host, port, false};
+    rtt_test(io);
+
     const auto zeroMasks {gen_pre_data_zero<Garbler::PreprocessedData>(circuit)};
     const auto gc {Garbler::garble(
         io,
@@ -67,6 +88,8 @@ BENCHMARK_END_ITERATION(garbler online, iteration)
 
 void evaluator(const Circuit& circuit, const std::string& host, const unsigned short port, const size_t iteration) {
     emp::NetIO io {emp::NetIO::CLIENT, host, port, false};
+    rtt_test(io);
+
     const auto zeroMasks {gen_pre_data_zero<Evaluator::PreprocessedData>(circuit)};
     const auto gc {Evaluator::garble(io, circuit)};
 
