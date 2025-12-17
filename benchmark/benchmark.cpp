@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
         ("host", po::value(&host)->default_value("127.0.0.1"), "Garbler's listening IPv4 address")
         ("port,p", po::value(&port)->default_value(12345), "port")
         ("circuit,c", po::value(&circuitFile), "Path of the circuit file")
-        ("iteration,i", po::value(&iteration)->default_value(128), "Number of iterations");
+        ("iteration,i", po::value(&iteration)->default_value(10), "Number of iterations");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -146,8 +146,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Invalid role. Aborting...\n";
         return 1;
     }
-    if (phase != "online") {
-        std::cerr << "Only supporting online phase.\n";
+    if (phase != "online" && phase != "pre") {
+        std::cerr << "Phase not supported.\n";
         return 1;
     }
     if (iteration == 0) {
@@ -156,11 +156,34 @@ int main(int argc, char* argv[]) {
 
     const Circuit circuit {circuitFile};
 
-    if (role == "garbler") {
-        garbler(circuit, host, port, iteration);
-    } else {
-        evaluator(circuit, host, port, iteration);
+    std::cout << "#AND gates: " << circuit.andGateSize << std::endl;
+
+    if (phase == "online") {
+        if (role == "garbler") {
+            garbler(circuit, host, port, iteration);
+        } else {
+            evaluator(circuit, host, port, iteration);
+        }
+    } else if (phase == "pre") {
+        if (role == "garbler") {
+            emp::NetIO io {emp::NetIO::SERVER, host, port, false};
+            BENCHMARK_INIT;
+            BENCHMARK_START;
+            for (size_t i {0}; i != iteration; ++i) {
+                Garbler::preprocess(io, circuit);
+            }
+            BENCHMARK_END_ITERATION(garber pre, iteration);
+        } else {
+            emp::NetIO io {emp::NetIO::CLIENT, host, port, false};
+            BENCHMARK_INIT;
+            BENCHMARK_START;
+            for (size_t i {0}; i != iteration; ++i) {
+                Evaluator::preprocess(io, circuit);
+            }
+            BENCHMARK_END_ITERATION(evaluator pre, iteration);
+        }
     }
+
 
     return 0;
 }
