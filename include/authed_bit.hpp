@@ -4,6 +4,7 @@
 #include <array>
 #include <stdexcept>
 #include <vector>
+#include <boost/bind/bind.hpp>
 
 #include <emp-tool/utils/block.h>
 
@@ -22,7 +23,6 @@ namespace ATLab {
     public:
 
         /**
-         *
          * @param bits size must be 128 * blockSize
          * @param macs size must be bits.size() * deltaArrSize
          */
@@ -186,8 +186,9 @@ namespace ATLab {
         friend class ITMacBlocks;
         friend class ITMacScaledBits;
 
+        using MacData = emp::block;
         Bitset _bits;
-        std::vector<emp::block> _macs; // _macs.size() == _bits.size() * deltaArrSize
+        std::vector<MacData> _macs; // _macs.size() == _bits.size() * deltaArrSize
     public:
         ITMacBits() = delete;
         ITMacBits(ITMacBits&&) = default;
@@ -267,6 +268,30 @@ namespace ATLab {
             return _bits;
         }
 
+        /**
+         * Open the bits to the other party who holds the corresponding ITMacBitKeys object.
+         * Send first the bits, then the hash of all the MACs authed with key 0
+         */
+
+        template <typename HashF>
+        void open(emp::NetIO& io, HashF&& h) const noexcept {
+            static_assert(
+                std::is_invocable_v<HashF, const void*, size_t>,
+                "HashF must be a function that takes two parameters: const void* and size_t.\n"
+            );
+            constexpr size_t HASH_BYTE {std::tuple_size_v<std::invoke_result_t<HashF, const void*, size_t>>};
+            using HashRes = std::invoke_result_t<HashF, const void*, size_t>;
+            static_assert(
+                std::is_same_v<HashRes, std::array<std::byte, HASH_BYTE>> && HASH_BYTE > 0,
+                "HashF must return std::array of bytes.\n"
+            );
+
+            send_boost_bitset(io, _bits);
+
+            const HashRes hash {_macs.data(), sizeof(MacData) * global_key_size()};
+            io.send_data(hash.data(), hash.size());
+        }
+
         ITMacBlocks polyval_to_Blocks() && {
             const size_t GLOBAL_KEY_SIZE {global_key_size()};
             return ITMacBlocks{_bits, std::move(_macs), GLOBAL_KEY_SIZE};
@@ -286,10 +311,22 @@ namespace ATLab {
         friend ITMacBits operator*(const Matrix<bool>&, const ITMacBits&);
     };
 
+    class ITMacOpenedBits {
+        const Bitset _bits;
+        ITMacOpenedBits() = delete;
+        explicit ITMacOpenedBits(Bitset bits) noexcept: _bits {std::move(bits)} {}
+
+    public:
+        auto test(const size_t pos) const noexcept {
+            return _bits.test(pos);
+        }
+    };
+
     class ITMacBitKeys {
+        friend class ITMacOpenedBits;
+
         std::vector<emp::block> _localKeys;
         std::vector<emp::block> _globalKeys;
-
     public:
         ITMacBitKeys() = delete;
         ITMacBitKeys(ITMacBitKeys&&) = default;
