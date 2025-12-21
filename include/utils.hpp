@@ -29,6 +29,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <emp-tool/utils/block.h>
 #include <emp-tool/utils/f2k.h>
 
+#include "emp-tool/io/net_io_channel.h"
+
 namespace ATLab {
 
     using Bitset = boost::dynamic_bitset<>;
@@ -77,6 +79,21 @@ namespace ATLab {
         std::vector<BitsetBlock> res;
         res.reserve(calc_bitset_block(bitset.size()));
         boost::to_block_range(bitset, std::back_inserter(res));
+        return res;
+    }
+
+    // TODO: replace
+    inline void send_boost_bitset(emp::NetIO& io, const Bitset& bitset) {
+        const auto blocks {dump_raw_blocks(bitset)};
+        io.send_data(blocks.data(), blocks.size() * sizeof(BitsetBlock));
+    }
+
+    [[nodiscard]]
+    inline Bitset receive_boost_bitset(emp::NetIO& io, const size_t bitSize) {
+        std::vector<BitsetBlock> blocks(calc_bitset_block(bitSize));
+        io.recv_data(blocks.data(), blocks.size() * sizeof(BitsetBlock));
+        Bitset res {blocks.cbegin(), blocks.cend()};
+        res.resize(bitSize);
         return res;
     }
 
