@@ -130,17 +130,9 @@ namespace ATLab {
                 return zero_block();
             }
 
-            size_t col {}, row {};
-            if (a > static_cast<Wire>(_circuit.totalInputSize)) {
-                col = _circuit.and_gate_order_by_output_wire(a) + _circuit.totalInputSize;
-            } else {
-                col = a;
-            }
-            if (b > static_cast<Wire>(_circuit.totalInputSize)) {
-                row = _circuit.and_gate_order_by_output_wire(b) + _circuit.inputSize1;
-            } else {
-                row = b - _circuit.inputSize0;
-            }
+            const size_t
+                col {_circuit.independent_index_map(a)},
+                row {_circuit.independent_index_map(b) - _circuit.inputSize0};
 
             // const size_t col {index_map(a)}, row {index_map(b)}; // <b_i a_j>
             return _resFlatMatrix.at(row * _totalIndependent + col);
