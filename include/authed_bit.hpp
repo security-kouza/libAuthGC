@@ -11,6 +11,7 @@
 #include "params.hpp"
 #include "block_correlated_OT.hpp"
 #include "ATLab/matrix.hpp"
+#include "ATLab/traits.hpp"
 
 namespace ATLab {
     class ITMacBlocks {
@@ -270,26 +271,14 @@ namespace ATLab {
 
         /**
          * Open the bits to the other party who holds the corresponding ITMacBitKeys object.
-         * Send first the bits, then the hash of all the MACs authed with key 0
+         * Send first the bits, then the hash of all the MACs authed with key[0]
          */
-
         template <typename HashF>
         void open(emp::NetIO& io, HashF&& h) const noexcept {
-            static_assert(
-                std::is_invocable_v<HashF, const void*, size_t>,
-                "HashF must be a function that takes two parameters: const void* and size_t.\n"
-            );
-            constexpr size_t HASH_BYTE {std::tuple_size_v<std::invoke_result_t<HashF, const void*, size_t>>};
-            using HashRes = std::invoke_result_t<HashF, const void*, size_t>;
-            static_assert(
-                std::is_same_v<HashRes, std::array<std::byte, HASH_BYTE>> && HASH_BYTE > 0,
-                "HashF must return std::array of bytes.\n"
-            );
-
             send_boost_bitset(io, _bits);
 
-            const HashRes hash {_macs.data(), sizeof(MacData) * global_key_size()};
-            io.send_data(hash.data(), hash.size());
+            const HashRes<HashF> hash {h(_macs.data(), sizeof(MacData) * size())};
+            io.send_data(hash.data(), sizeof(hash));
         }
 
         ITMacBlocks polyval_to_Blocks() && {
@@ -312,6 +301,8 @@ namespace ATLab {
     };
 
     class ITMacOpenedBits {
+        friend class ITMacBitKeys;
+
         const Bitset _bits;
         ITMacOpenedBits() = delete;
         explicit ITMacOpenedBits(Bitset bits) noexcept: _bits {std::move(bits)} {}
@@ -323,10 +314,11 @@ namespace ATLab {
     };
 
     class ITMacBitKeys {
-        friend class ITMacOpenedBits;
+        using LocalKey = emp::block;
+        using GlobalKey = emp::block;
 
-        std::vector<emp::block> _localKeys;
-        std::vector<emp::block> _globalKeys;
+        std::vector<LocalKey> _localKeys;
+        std::vector<GlobalKey> _globalKeys;
     public:
         ITMacBitKeys() = delete;
         ITMacBitKeys(ITMacBitKeys&&) = default;
@@ -346,7 +338,7 @@ namespace ATLab {
         }
 
         /**
-         * Construct keys for random authenticated bits
+         * Construct keys for random authenticated bits.
          * Protocol interactions involved.
          * _bits will not be available.
          * @param len Number of bits to generate.
@@ -404,6 +396,42 @@ namespace ATLab {
 
         const emp::block& get_global_key(const size_t pos) const {
             return _globalKeys.at(pos);
+        }
+
+        /**
+         * Open to get the bits from the other party.
+         */
+        template <typename HashF>
+        [[nodiscard]]
+        ITMacOpenedBits open(emp::NetIO& io, HashF&& h) const noexcept {
+            using HashRes = HashRes<HashF>;
+            static_assert(std::is_same_v<LocalKey, GlobalKey>); // For xoring
+            /**
+             * First, receive the bits.
+             * Next, receive the hash of all the MACs authed with key[0].
+             * Finally, compare with the hash of the local keys. Abort if the two hashes are not equal.
+             */
+
+            std::vector<LocalKey> bufKeys;
+            bufKeys.reserve(size());
+
+            Bitset bits {receive_boost_bitset(io, size())};
+            const auto& globalKey {get_global_key(0)};
+            for (size_t i {0}; i < size(); ++i) {
+                bufKeys.push_back(_mm_xor_si128(
+                    get_local_key(0, i),
+                    and_all_bits(bits.test(i), globalKey)
+                ));
+            }
+            HashRes localHash {h(bufKeys.data(), sizeof(LocalKey) * size())};
+
+            HashRes macHash {};
+            io.recv_data(macHash.data(), sizeof(macHash));
+            if (localHash != macHash) {
+                throw std::runtime_error{"The hashes of local keys and MACs are not equal."};
+            }
+
+            return ITMacOpenedBits{std::move(bits)};
         }
 
         ITMacBlockKeys polyval_to_Blocks() && {
