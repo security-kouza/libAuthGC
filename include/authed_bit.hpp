@@ -403,7 +403,7 @@ namespace ATLab {
          */
         template <typename HashF>
         [[nodiscard]]
-        ITMacOpenedBits open(emp::NetIO& io, HashF&& h) const noexcept {
+        ITMacOpenedBits open(emp::NetIO& io, HashF&& h) const {
             using HashRes = HashRes<HashF>;
             static_assert(std::is_same_v<LocalKey, GlobalKey>); // For xoring
             /**

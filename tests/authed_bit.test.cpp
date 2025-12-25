@@ -103,7 +103,6 @@ TEST(Authed_Bit, fixed_bits) {
 TEST(Authed_Bit, random_blocks) {
     constexpr size_t deltaSize {3};
     constexpr size_t blockSize {40};
-    constexpr unsigned short BLOCK_PORT {static_cast<unsigned short>(PORT + 2)};
 
     std::vector<emp::block> deltaArr(deltaSize);
     auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
@@ -153,7 +152,6 @@ TEST(Authed_Bit, random_blocks) {
 TEST(Authed_Bit, fixed_blocks) {
     constexpr size_t deltaSize {3};
     constexpr size_t blockSize {40};
-    constexpr unsigned short LOCAL_PORT {static_cast<unsigned short>(PORT + 1)};
 
     std::vector<emp::block> deltaArr(deltaSize);
     auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
@@ -275,4 +273,65 @@ TEST(Authed_Bit, fixed_blocks_scalar_bitset) {
         };
         EXPECT_EQ(expected, ATLab::as_uint128(authedBlocks->get_mac(blockIter)));
     }
+}
+
+TEST(Authed_Bit, open) {
+    using namespace ATLab;
+
+    constexpr size_t bitSize {128};
+    emp::block globalKey;
+    do {
+        THE_GLOBAL_PRNG.random_block(&globalKey, 1);
+    } while (as_uint128(globalKey) == 0);
+
+    std::array<bool, bitSize> bitArr {};
+    Bitset bits(bitSize);
+    THE_GLOBAL_PRNG.random_bool(bitArr.data(), bitSize);
+    for (size_t i {0}; i != bitSize; ++i) {
+        bits.set(i, bitArr.at(i));
+    }
+
+    std::vector<emp::block> macs(bitSize), localKeys(bitSize);
+    THE_GLOBAL_PRNG.random_block(macs.data(), macs.size());
+    for (size_t i {0}; i != macs.size(); ++i) {
+        localKeys[i] = _mm_xor_si128(macs[i], and_all_bits(bitArr[i], globalKey));
+    }
+
+    const ITMacBits authedBits {std::move(bits), std::move(macs)};
+    const ITMacBitKeys keys {std::move(localKeys), {globalKey}};
+
+    auto hash {[&](const void* data, const size_t size) -> std::array<std::byte, 16> {
+        const emp::block hashBlock {emp::Hash::hash_for_block(data, size)};
+        std::array<std::byte, 16> res;
+        std::memcpy(res.data(), &hashBlock, sizeof(res));
+        return res;
+    }};
+
+    std::thread senderThread {[&]() {
+        auto& io {server_io()};
+        authedBits.open(io, hash);
+
+        authedBits.open(io, hash);
+
+        io.flush();
+    }}, receiverThread {[&]() {
+        auto& io {client_io()};
+        EXPECT_NO_THROW(
+            const ITMacOpenedBits opened {keys.open(io, hash)};
+            for (size_t i {0}; i != bitSize; ++i) {
+                EXPECT_EQ(bitArr[i], opened.test(i));
+            }
+        );
+
+        std::vector<emp::block> randomKeys(bitSize);
+        THE_GLOBAL_PRNG.random_block(randomKeys.data(), randomKeys.size());
+        const ITMacBitKeys falseKey {std::move(randomKeys), {globalKey}};
+        EXPECT_THROW(
+            falseKey.open(io, hash);
+        , std::runtime_error);
+        io.flush();
+    }};
+
+    senderThread.join();
+    receiverThread.join();
 }
