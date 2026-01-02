@@ -297,7 +297,7 @@ TEST(Authed_Bit, open) {
         localKeys[i] = _mm_xor_si128(macs[i], and_all_bits(bitArr[i], globalKey));
     }
 
-    const ITMacBits authedBits {std::move(bits), std::move(macs)};
+    const ITMacBits authedBits {bits, std::move(macs)};
     const ITMacBitKeys keys {std::move(localKeys), {globalKey}};
 
     auto hash {[&](const void* data, const size_t size) -> std::array<std::byte, 16> {
@@ -307,11 +307,23 @@ TEST(Authed_Bit, open) {
         return res;
     }};
 
+    constexpr size_t SLICE_BEGIN {1}, SLICE_END {bitSize};
+
+    /**
+     * Test three times
+     * - normal
+     * - sliced version
+     * - malicious prover with faked macs
+     */
     std::thread senderThread {[&]() {
         auto& io {server_io()};
         authedBits.open(io, hash);
+        authedBits.open(io, hash, SLICE_BEGIN, SLICE_END);
 
-        authedBits.open(io, hash);
+        std::vector<emp::block> randomMacs(bitSize);
+        THE_GLOBAL_PRNG.random_block(randomMacs.data(), randomMacs.size());
+        const ITMacBits fakeMacs {bits, std::move(randomMacs)};
+        fakeMacs.open(io, hash);
 
         io.flush();
     }}, receiverThread {[&]() {
@@ -323,11 +335,15 @@ TEST(Authed_Bit, open) {
             }
         );
 
-        std::vector<emp::block> randomKeys(bitSize);
-        THE_GLOBAL_PRNG.random_block(randomKeys.data(), randomKeys.size());
-        const ITMacBitKeys falseKey {std::move(randomKeys), {globalKey}};
+        EXPECT_NO_THROW(
+            const ITMacOpenedBits opened {keys.open(io, hash, SLICE_BEGIN, SLICE_END)};
+            for (size_t i {0}; i != SLICE_END - SLICE_BEGIN; ++i) {
+                EXPECT_EQ(bitArr[SLICE_BEGIN + i], opened.test(i));
+            }
+        );
+
         EXPECT_THROW(
-            falseKey.open(io, hash);
+            keys.open(io, hash);
         , std::runtime_error);
         io.flush();
     }};

@@ -274,10 +274,18 @@ namespace ATLab {
          * Send first the bits, then the hash of all the MACs authed with key[0]
          */
         template <typename HashF>
-        void open(emp::NetIO& io, HashF&& h) const noexcept {
-            send_boost_bitset(io, _bits);
+        void open(emp::NetIO& io, HashF&& h, const size_t begin = 0, const size_t end = 0) const noexcept {
+            assert(
+                (end == 0 && begin == 0) ||
+                (end != 0 && (
+                    begin < size() && begin < end && end <= size()
+                ))
+            );
 
-            const HashRes<HashF> hash {h(_macs.data(), sizeof(MacData) * size())};
+            send_boost_bitset(io, _bits, begin, end);
+
+            const size_t openSize {(end == 0) ? size() : (end - begin)};
+            const HashRes<HashF> hash {h(_macs.data() + begin, sizeof(MacData) * openSize)};
             io.send_data(hash.data(), sizeof(hash));
         }
 
@@ -403,7 +411,19 @@ namespace ATLab {
          */
         template <typename HashF>
         [[nodiscard]]
-        ITMacOpenedBits open(emp::NetIO& io, HashF&& h) const {
+        ITMacOpenedBits open(emp::NetIO& io, HashF&& h, const size_t begin = 0, size_t end = 0) const {
+            assert(
+                (end == 0 && begin == 0) ||
+                (end != 0 && (
+                    begin < size() && begin < end && end <= size()
+                ))
+            );
+
+            if (end == 0) {
+                end = size();
+            }
+            const size_t sliceSize {end - begin};
+
             using HashRes = HashRes<HashF>;
             static_assert(std::is_same_v<LocalKey, GlobalKey>); // For xoring
             /**
@@ -415,15 +435,15 @@ namespace ATLab {
             std::vector<LocalKey> bufKeys;
             bufKeys.reserve(size());
 
-            Bitset bits {receive_boost_bitset(io, size())};
+            Bitset bits {receive_boost_bitset(io, sliceSize)};
             const auto& globalKey {get_global_key(0)};
-            for (size_t i {0}; i < size(); ++i) {
+            for (size_t i {0}; i < sliceSize; ++i) {
                 bufKeys.push_back(_mm_xor_si128(
-                    get_local_key(0, i),
+                    get_local_key(0, begin + i),
                     and_all_bits(bits.test(i), globalKey)
                 ));
             }
-            HashRes localHash {h(bufKeys.data(), sizeof(LocalKey) * size())};
+            HashRes localHash {h(bufKeys.data(), sizeof(LocalKey) * bufKeys.size())};
 
             HashRes macHash {};
             io.recv_data(macHash.data(), sizeof(macHash));
