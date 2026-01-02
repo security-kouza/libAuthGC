@@ -68,6 +68,11 @@ namespace ATLab {
     // Little Endian
     emp::block Block(const std::bitset<128>&);
 
+
+    /*
+     * bitset utils
+     */
+
     [[nodiscard]]
     inline size_t calc_bitset_block(const size_t bits) {
         constexpr size_t bitsPerBlock {Bitset::bits_per_block};
@@ -83,9 +88,31 @@ namespace ATLab {
     }
 
     // TODO: replace
-    inline void send_boost_bitset(emp::NetIO& io, const Bitset& bitset) {
-        const auto blocks {dump_raw_blocks(bitset)};
-        io.send_data(blocks.data(), blocks.size() * sizeof(BitsetBlock));
+    /**
+     * @param io
+     * @param bitset
+     * @param beginPos
+     * @param endPos 0 meaning until the end. Requiring endPos > beginPos
+     */
+    inline void send_boost_bitset(
+        emp::NetIO& io,
+        const Bitset& bitset,
+        const size_t beginPos = 0,
+        const size_t endPos = 0
+    ) {
+        std::vector<BitsetBlock> blocksToSend;
+        if (beginPos == 0 && endPos == 0) {
+            blocksToSend = dump_raw_blocks(bitset);
+        } else {
+            assert(beginPos < bitset.size());
+            assert(endPos <= bitset.size());
+            assert(endPos > beginPos);
+
+            Bitset sliced {bitset >> beginPos};
+            sliced.resize(endPos - beginPos);
+            blocksToSend = dump_raw_blocks(sliced);
+        }
+        io.send_data(blocksToSend.data(), blocksToSend.size() * sizeof(BitsetBlock));
     }
 
     [[nodiscard]]
