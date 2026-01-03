@@ -110,7 +110,7 @@ namespace ATLab {
     {}
 
     ITMacBlocks::ITMacBlocks(
-        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const size_t blockSize
     ):
         ITMacBlocks {

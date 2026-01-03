@@ -34,7 +34,7 @@ namespace ATLab {
          * Protocol interactions involved.
          * @param blockSize Number of blocks to generate.
          */
-        ITMacBlocks(BlockCorrelatedOT::Receiver& bCOTReceiver, size_t blockSize);
+        ITMacBlocks(const BlockCorrelatedOT::Receiver& bCOTReceiver, size_t blockSize);
 
         // `Fix` for blocks
         ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
@@ -217,7 +217,7 @@ namespace ATLab {
          * Protocol interactions involved.
          * @param len Number of bits to generate.
          */
-        ITMacBits(BlockCorrelatedOT::Receiver& bCOTReceiver, const size_t len):
+        ITMacBits(const BlockCorrelatedOT::Receiver& bCOTReceiver, const size_t len):
             ITMacBits {[&bCOTReceiver, len]() -> ITMacBits {
                 auto [u, m] {bCOTReceiver.extend(len)};
                 return ITMacBits{std::move(u), std::move(m)};
