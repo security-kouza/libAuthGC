@@ -1,9 +1,14 @@
 #ifndef ATLab_DVZK_HPP
 #define ATLab_DVZK_HPP
 
+#include <array>
+#include <vector>
+
 #include <emp-tool/io/net_io_channel.h>
+#include <emp-tool/utils/f2k.h>
 
 #include "utils.hpp"
+
 #include "block_correlated_OT.hpp"
 #include "authed_bit.hpp"
 
@@ -104,7 +109,7 @@ namespace ATLab::DVZK {
             emp::block prodTwoKeys, prodZWithDelta;
             emp::gfmul(localKeys[0], localKeys[1], &prodTwoKeys);
             emp::gfmul(localKeys[2], delta_, &prodZWithDelta);
-            emp::block diff {_mm_xor_si128(prodTwoKeys, prodZWithDelta)};
+            const emp::block diff {_mm_xor_si128(prodTwoKeys, prodZWithDelta)};
 
             emp::block contribution;
             emp::gfmul(challenge, diff, &contribution);
@@ -131,7 +136,7 @@ namespace ATLab::DVZK {
     template<size_t blockSize>
     void prove(
         emp::NetIO& io,
-        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const ITMacBlocks& x,
         const ITMacBlocks& y,
         const ITMacBlocks& z
@@ -175,7 +180,7 @@ namespace ATLab::DVZK {
     template <size_t blockSize>
     void verify(
         emp::NetIO& io,
-        BlockCorrelatedOT::Sender& bCOTSender,
+        const BlockCorrelatedOT::Sender& bCOTSender,
         const ITMacBlockKeys& x,
         const ITMacBlockKeys& y,
         const ITMacBlockKeys& z
@@ -232,7 +237,7 @@ namespace ATLab::DVZK {
     template<size_t blockSize>
     void prove(
         emp::NetIO& io,
-        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const ITMacBits& x,
         const ITMacBlocks& y,
         const ITMacBlocks& z
@@ -288,7 +293,7 @@ namespace ATLab::DVZK {
     template <size_t blockSize>
     void verify(
         emp::NetIO& io,
-        BlockCorrelatedOT::Sender& bCOTSender,
+        const BlockCorrelatedOT::Sender& bCOTSender,
         const ITMacBitKeys& x,
         const ITMacBlockKeys& y,
         const ITMacBlockKeys& z
@@ -329,6 +334,107 @@ namespace ATLab::DVZK {
         io.recv_data(&A1, sizeof(A1));
 
         B = _mm_xor_si128(B, A0);
+        emp::block expected;
+        emp::gfmul(A1, delta, &expected);
+        if (emp::cmpBlock(&B, &expected, 1) == false) {
+            throw std::runtime_error{"Malicious behavior detected: DVZK verification failed."};
+        }
+    }
+
+    inline void prove(
+        emp::NetIO& io,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const ITMacBits& x,
+        const ITMacBlocks& y,
+        const ITMacBlocks& z,
+        const size_t blockSize
+    ) noexcept {
+        assert(x.size() == blockSize);
+        assert(z.size() == blockSize);
+        assert(y.size() == 1);
+
+        const emp::block& yValue {y.get_block(0)};
+        const emp::block& yMac {y.get_mac(0, 0)};
+
+        const auto authedBlock {ITMacBlocks{bCOTReceiver, 1}};
+
+        emp::block challengeSeed;
+        io.recv_data(&challengeSeed, sizeof(challengeSeed));
+
+        auto chalGen {emp::PRG{&challengeSeed}};
+        std::vector<emp::block> challenges(blockSize);
+        chalGen.random_block(challenges.data(), blockSize);
+
+        std::vector<emp::block> macProd(blockSize);
+        for (size_t i {0}; i != blockSize; ++i) {
+            emp::gfmul(x.get_mac(0, i), yMac, &macProd[i]);
+        }
+        emp::block A0;
+        emp::vector_inn_prdt_sum_red(&A0, challenges.data(), macProd.data(), blockSize);
+        xor_to(A0, authedBlock.get_mac(0, 0));
+
+        std::vector<emp::block> tmp(blockSize);
+        for (size_t i {0}; i != blockSize; ++i) {
+            const emp::block prodXMacOfY {x[i] ? yMac : zero_block()};
+            emp::block prodYMacOfX;
+            emp::gfmul(yValue, x.get_mac(0, i), &prodYMacOfX);
+            tmp[i] = z.get_mac(0, i);
+            xor_to(tmp[i], prodXMacOfY);
+            xor_to(tmp[i], prodYMacOfX);
+        }
+        emp::block A1;
+        emp::vector_inn_prdt_sum_red(&A1, challenges.data(), tmp.data(), blockSize);
+        xor_to(A1, authedBlock.get_block(0));
+
+        io.send_data(&A0, sizeof(A0));
+        io.send_data(&A1, sizeof(A1));
+    }
+
+    inline void verify(
+        emp::NetIO& io,
+        const BlockCorrelatedOT::Sender& bCOTSender,
+        const ITMacBitKeys& x,
+        const ITMacBlockKeys& y,
+        const ITMacBlockKeys& z,
+        const size_t blockSize
+    ) {
+        assert(x.size() == blockSize);
+        assert(z.size() == blockSize);
+        assert(y.size() == 1);
+
+        const emp::block delta  {x.get_global_key(0)};
+        const auto& yKey {y.get_local_key(0, 0)};
+        assert(as_uint128(delta) == as_uint128(y.get_global_key(0)));
+        assert(as_uint128(delta) == as_uint128(z.get_global_key(0)));
+
+        const auto authedBlockKey {ITMacBlockKeys{bCOTSender, 1}};
+
+        const emp::block challengeSeed {_mm_set_epi64x(THE_GLOBAL_PRNG(), THE_GLOBAL_PRNG())};
+        io.send_data(&challengeSeed, sizeof(challengeSeed));
+
+        auto chalGen {emp::PRG{&challengeSeed}};
+
+        std::vector<emp::block> challenges(blockSize);
+        chalGen.random_block(challenges.data(), blockSize);
+
+        std::vector<emp::block> tmp(blockSize);
+        for (size_t i {0}; i != blockSize; ++i) {
+            emp::block prodTwoKeys, prodZWithDelta;
+            emp::gfmul(x.get_local_key(0, i), yKey, &prodTwoKeys);
+            emp::gfmul(z.get_local_key(0, i), delta, &prodZWithDelta);
+            tmp[i] = prodTwoKeys;
+            xor_to(tmp[i], prodZWithDelta);
+        }
+
+        emp::block B;
+        emp::vector_inn_prdt_sum_red(&B, challenges.data(), tmp.data(), blockSize);
+        xor_to(B, authedBlockKey.get_local_key(0, 0));
+
+        emp::block A0, A1;
+        io.recv_data(&A0, sizeof(A0));
+        io.recv_data(&A1, sizeof(A1));
+
+        xor_to(B, A0);
         emp::block expected;
         emp::gfmul(A1, delta, &expected);
         if (emp::cmpBlock(&B, &expected, 1) == false) {

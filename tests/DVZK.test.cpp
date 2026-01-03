@@ -146,6 +146,71 @@ TEST(DVZK, bits_and_constant) {
     proverThread.join();
 }
 
+TEST(DVZK, dynamic_bits_and_constant) {
+    auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
+
+    std::thread verifierThread {
+        [prng]() mutable {
+            std::vector<emp::block> deltaArr(GLOBAL_KEY_SIZE);
+            for (auto& delta : deltaArr) {
+                delta = ATLab::as_block(prng());
+            }
+
+            auto& io {server_io()};
+            ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
+
+            const ATLab::ITMacBitKeys aKeys {io, sender, BLOCK_SIZE};
+
+            const ATLab::ITMacBlockKeys
+                bKeys {io, sender, 1},
+                cKeys {io, sender, BLOCK_SIZE},
+                randomKeys {io, sender, BLOCK_SIZE};
+
+            EXPECT_NO_THROW(
+                ATLab::DVZK::verify(io, sender, aKeys, bKeys, cKeys, BLOCK_SIZE)
+            );
+            EXPECT_THROW(
+                ATLab::DVZK::verify(io, sender, aKeys, bKeys, randomKeys, BLOCK_SIZE),
+                std::runtime_error
+            );
+            io.flush();
+        }
+    };
+
+    std::thread proverThread {
+        [prng]() mutable {
+            const auto aBits {ATLab::random_dynamic_bitset(BLOCK_SIZE)};
+            const auto bBlock {ATLab::as_block(prng())};
+
+            std::vector<emp::block>
+                cBlocks(BLOCK_SIZE, _mm_set_epi64x(0, 0)),
+                randomBlocks(BLOCK_SIZE);
+
+            for (size_t i {0}; i != BLOCK_SIZE; ++i) {
+                randomBlocks.at(i) = ATLab::as_block(prng());
+                if (aBits[i]) {
+                    cBlocks[i] = bBlock;
+                }
+            }
+            auto& io {client_io()};
+            ATLab::BlockCorrelatedOT::Receiver receiver(io, GLOBAL_KEY_SIZE);
+
+            const auto aAuth {ATLab::ITMacBits{io, receiver, aBits}};
+            const ATLab::ITMacBlocks
+                bAuth {io, receiver, {bBlock}},
+                cAuth {io, receiver, cBlocks},
+                randomAuth {io, receiver, randomBlocks};
+
+            ATLab::DVZK::prove(io, receiver, aAuth, bAuth, cAuth, BLOCK_SIZE);
+            ATLab::DVZK::prove(io, receiver, aAuth, bAuth, randomAuth, BLOCK_SIZE);
+            io.flush();
+        }
+    };
+
+    verifierThread.join();
+    proverThread.join();
+}
+
 TEST(DVZK, streaming_inner_product) {
     auto prng {ATLab::PRNG_Kyber::get_PRNG_Kyber()};
 
