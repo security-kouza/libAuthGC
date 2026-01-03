@@ -167,7 +167,7 @@ TEST(DVZK, streaming_inner_product) {
             const auto delta {deltaArr.at(0)};
 
             {
-                ATLab::DVZK::Verifier streamingVerifier {io, sender, delta};
+                ATLab::DVZK::Verifier streamingVerifier {io, sender};
                 for (size_t i {0}; i != BLOCK_SIZE; ++i) {
                     streamingVerifier.update({
                         aKeys.get_local_key(0, i),
@@ -179,7 +179,7 @@ TEST(DVZK, streaming_inner_product) {
             }
 
             {
-                ATLab::DVZK::Verifier tamperedVerifier {io, sender, delta};
+                ATLab::DVZK::Verifier tamperedVerifier {io, sender};
                 for (size_t i {0}; i != BLOCK_SIZE; ++i) {
                     tamperedVerifier.update({
                         aKeys.get_local_key(0, i),
@@ -281,7 +281,7 @@ TEST(DVZK, streaming_bits) {
             const auto delta {deltaArr.at(0)};
 
             {
-                ATLab::DVZK::Verifier streamingVerifier {io, sender, delta};
+                ATLab::DVZK::Verifier streamingVerifier {io, sender};
                 for (size_t i {0}; i != BLOCK_SIZE; ++i) {
                     streamingVerifier.update({
                         aKeys.get_local_key(0, i),
@@ -293,7 +293,7 @@ TEST(DVZK, streaming_bits) {
             }
 
             {
-                ATLab::DVZK::Verifier tamperedVerifier {io, sender, delta};
+                ATLab::DVZK::Verifier tamperedVerifier {io, sender};
                 for (size_t i {0}; i != BLOCK_SIZE; ++i) {
                     tamperedVerifier.update({
                         aKeys.get_local_key(0, i),

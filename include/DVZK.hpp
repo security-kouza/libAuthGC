@@ -25,7 +25,7 @@ namespace ATLab::DVZK {
         }
 
         // authedBlocks[0] * authedBlocks[1] == authedBlocks[2]
-        void update(const std::array<emp::block, 3> authedBlocks, const std::array<emp::block, 3> macs) noexcept {
+        void update(const std::array<emp::block, 3>& authedBlocks, const std::array<emp::block, 3>& macs) noexcept {
             assert(as_uint128(authedBlocks[2]) == as_uint128(
                 detail::gf_mul_block(authedBlocks[0], authedBlocks[1]))
             );
@@ -51,7 +51,7 @@ namespace ATLab::DVZK {
         }
 
         // authedBits[0] * authedBits[1] == authedBits[2]
-        void update(const std::array<bool, 3> authedBits, const std::array<emp::block, 3> macs) noexcept {
+        void update(const std::array<bool, 3> authedBits, const std::array<emp::block, 3>& macs) noexcept {
             assert(authedBits[2] == (authedBits[0] && authedBits[1]));
 
             emp::block challenge;
@@ -87,8 +87,8 @@ namespace ATLab::DVZK {
         emp::block B_;
         std::unique_ptr<emp::PRG> _pChalGen;
     public:
-        Verifier(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender, const emp::block& delta):
-            delta_ {delta},
+        Verifier(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender):
+            delta_ {bCOTSender.get_delta(0)},
             _authedBlockKey {ITMacBlockKeys{bCOTSender, 1}},
             B_ {_authedBlockKey.get_local_key(0, 0)}
         {
@@ -97,7 +97,7 @@ namespace ATLab::DVZK {
             _pChalGen = std::make_unique<emp::PRG>(&challengeSeed);
         }
 
-        void update(const std::array<emp::block, 3> localKeys) noexcept {
+        void update(const std::array<emp::block, 3>& localKeys) noexcept {
             emp::block challenge;
             _pChalGen->random_block(&challenge, 1);
 

@@ -65,7 +65,7 @@ namespace ATLab::BlockCorrelatedOT {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
 #else
-            auto& instance = shared_ot_storage().at(role_index(role));
+            const auto& instance = shared_ot_storage().at(role_index(role));
 #endif
             if (!instance) {
                 throw std::logic_error{"Shared IKNP sender OT is not initialized"};
