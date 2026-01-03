@@ -330,6 +330,40 @@ BENCHMARK_END(G step 9);
 
             ITMacBitKeys beaverTripleKeys {io, globalKey.get_COT_sender(), circuit.andGateSize};
 
+            /**
+             * Consistency check
+             */
+
+            DVZK::Prover prover {io, {io, 1}};
+            DVZK::Verifier verifier {io, globalKey.get_COT_sender()};
+            circuit.for_each_AND_gate([&](const Gate& gate, const size_t andGateOrder) -> void {
+                prover.update(std::array<bool, 3>{
+                    masks.at(gate.in0),
+                    masks.at(gate.in1),
+                    authedAndedMasks.at(andGateOrder)
+                }, {
+                    masks.get_mac(0, gate.in0),
+                    masks.get_mac(0, gate.in1),
+                    authedAndedMasks.get_mac(1 /* ΔB is the second key */, andGateOrder)
+                });
+                verifier.update({
+                    maskKeys.get_local_key(0, gate.in0),
+                    maskKeys.get_local_key(0, gate.in1),
+                    evaluatorAndedMasks.get_local_key(0, andGateOrder)
+                });
+            });
+            prover.prove(io);
+            verifier.verify(io);
+
+            DVZK::verify(
+                io,
+                globalKey.get_COT_sender(),
+                bStarKeys,
+                {{globalKey.get_alpha_0()}, globalKey.get_delta()},
+                dualAuthedBStar,
+                compressParam
+            );
+
             return {
                 std::move(masks),
                 std::move(maskKeys),
@@ -438,17 +472,39 @@ BENCHMARK_START
             ITMacBits authedBeaverTriple {io, globalKey.get_COT_receiver(), std::move(beaverTripleShare)};
 BENCHMARK_END(E step 10)
 
-            // DEBUG
-            // std::clog << "key: ";
-            // for (size_t i {0}, andGateIter {0}; andGateIter != 8; ++i) {
-            //     const auto& gate {circuit.gates[i]};
-            //     if (!gate.is_and()) {
-            //         continue;
-            //     }
-            //     std::clog << get_LSB(dualAuthed_ab(gate.in0, gate.in1));
-            //     ++andGateIter;
-            // }
-            // std::clog << '\n';
+            /**
+             * Consistency check
+             */
+
+            DVZK::Verifier verifier {io, {io, {globalKey.get_delta()}}};
+            DVZK::Prover prover {io, globalKey.get_COT_receiver()};
+            circuit.for_each_AND_gate([&](const Gate& gate, const size_t andGateOrder) -> void {
+                verifier.update({
+                    maskKeys.get_local_key(0, gate.in0),
+                    maskKeys.get_local_key(0, gate.in1),
+                    garblerAndedMasks.get_local_key(1, andGateOrder)
+                });
+                prover.update(std::array<bool, 3>{
+                    masks.at(gate.in0),
+                    masks.at(gate.in1),
+                    authedAndedMasks.at(andGateOrder)
+                }, {
+                    masks.get_mac(0, gate.in0),
+                    masks.get_mac(0, gate.in1),
+                    authedAndedMasks.get_mac(0, andGateOrder)
+                });
+            });
+            verifier.verify(io);
+            prover.prove(io);
+
+            DVZK::prove(
+                io,
+                globalKey.get_COT_receiver(),
+                bStar,
+                {{globalKey.get_delta()}, {globalKey.get_beta_0()}, 1},
+                dualAuthedBStar,
+                compressParam
+            );
 
             return {
                 std::move(masks),
