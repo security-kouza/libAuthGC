@@ -8,6 +8,127 @@
 #include "authed_bit.hpp"
 
 namespace ATLab::DVZK {
+
+
+    // verifying x[i] y[i] = z[i] with dynamic size
+    class Verifier {
+        const emp::block delta_;
+        const ITMacBlockKeys _authedBlockKey;
+        emp::block B_;
+        std::unique_ptr<emp::PRG> _pChalGen;
+    public:
+        Verifier(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender, const emp::block& delta):
+            delta_ {delta},
+            _authedBlockKey {ITMacBlockKeys{bCOTSender, 1}},
+            B_ {_authedBlockKey.get_local_key(0, 0)}
+        {
+            emp::block challengeSeed {_mm_set_epi64x(THE_GLOBAL_PRNG(), THE_GLOBAL_PRNG())};
+            io.send_data(&challengeSeed, sizeof(challengeSeed));
+            _pChalGen = std::make_unique<emp::PRG>(&challengeSeed);
+        }
+
+        void update(const std::array<emp::block, 3> localKeys) noexcept {
+            emp::block challenge;
+            _pChalGen->random_block(&challenge, 1);
+
+            emp::block prodTwoKeys, prodZWithDelta;
+            emp::gfmul(localKeys[0], localKeys[1], &prodTwoKeys);
+            emp::gfmul(localKeys[2], delta_, &prodZWithDelta);
+            emp::block diff {_mm_xor_si128(prodTwoKeys, prodZWithDelta)};
+
+            emp::block contribution;
+            emp::gfmul(challenge, diff, &contribution);
+            xor_to(B_, contribution);
+        }
+
+        void verify(emp::NetIO& io) const {
+            emp::block A0, A1;
+            io.recv_data(&A0, sizeof(A0));
+            io.recv_data(&A1, sizeof(A1));
+
+            emp::block adjusted {B_};
+            xor_to(adjusted, A0);
+
+            emp::block expected;
+            emp::gfmul(A1, delta_, &expected);
+            if (emp::cmpBlock(&adjusted, &expected, 1) == false) {
+                throw std::runtime_error{"Malicious behavior detected: DVZK verification failed."};
+            }
+        }
+    };
+
+    // proving x[i] y[i] = z[i] with dynamic size
+    class Prover {
+        const ITMacBlocks _authedBlock;
+        emp::block A0_, A1_;
+        std::unique_ptr<emp::PRG> _pChalGen;
+    public:
+        Prover(emp::NetIO& io, BlockCorrelatedOT::Receiver& bCOTReceiver):
+            _authedBlock {ITMacBlocks{bCOTReceiver, 1}},
+            A0_ {_authedBlock.get_mac(0, 0)},
+            A1_ {_authedBlock.get_block(0)}
+        {
+            emp::block challengeSeed;
+            io.recv_data(&challengeSeed, sizeof(challengeSeed));
+            _pChalGen = std::make_unique<emp::PRG>(&challengeSeed);
+        }
+
+        // authedBlocks[0] * authedBlocks[1] == authedBlocks[2]
+        void update(const std::array<emp::block, 3> authedBlocks, const std::array<emp::block, 3> macs) noexcept {
+            assert(as_uint128(authedBlocks[2]) == as_uint128(
+                detail::gf_mul_block(authedBlocks[0], authedBlocks[1]))
+            );
+
+            emp::block challenge;
+            _pChalGen->random_block(&challenge, 1);
+
+            emp::block macProduct;
+            emp::gfmul(macs[0], macs[1], &macProduct);
+            emp::block a0Contribution;
+            emp::gfmul(challenge, macProduct, &a0Contribution);
+            xor_to(A0_, a0Contribution);
+
+            emp::block prodXMacOfY, prodYMacOfX;
+            emp::gfmul(authedBlocks[0], macs[1], &prodXMacOfY);
+            emp::gfmul(authedBlocks[1], macs[0], &prodYMacOfX);
+            emp::block tmp {_mm_xor_si128(macs[2], prodXMacOfY)};
+            tmp = _mm_xor_si128(tmp, prodYMacOfX);
+
+            emp::block a1Contribution;
+            emp::gfmul(challenge, tmp, &a1Contribution);
+            xor_to(A1_, a1Contribution);
+        }
+
+        // authedBits[0] * authedBits[1] == authedBits[2]
+        void update(const std::array<bool, 3> authedBits, const std::array<emp::block, 3> macs) noexcept {
+            assert(authedBits[2] == (authedBits[0] && authedBits[1]));
+
+            emp::block challenge;
+            _pChalGen->random_block(&challenge, 1);
+
+            emp::block macProduct;
+            emp::gfmul(macs[0], macs[1], &macProduct);
+            emp::block a0Contribution;
+            emp::gfmul(challenge, macProduct, &a0Contribution);
+            xor_to(A0_, a0Contribution);
+
+            const emp::block prodXMacOfY {and_all_bits(authedBits[0], macs[1])};
+            const emp::block prodYMacOfX {and_all_bits(authedBits[1], macs[0])};
+            emp::block tmp {_mm_xor_si128(macs[2], prodXMacOfY)};
+            tmp = _mm_xor_si128(tmp, prodYMacOfX);
+
+            emp::block a1Contribution;
+            emp::gfmul(challenge, tmp, &a1Contribution);
+            xor_to(A1_, a1Contribution);
+        }
+
+
+        void prove(emp::NetIO& io) const noexcept {
+            io.send_data(&A0_, sizeof(A0_));
+            io.send_data(&A1_, sizeof(A1_));
+        }
+    };
+
     // proving x[i] y[i] = z[i]
     template<size_t blockSize>
     void prove(
