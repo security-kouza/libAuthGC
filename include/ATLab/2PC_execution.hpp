@@ -25,7 +25,7 @@ namespace ATLab {
             const GarbledCircuit& gc,
             const PreprocessedData& wireMasks,
             const Bitset& input
-        );
+        ) noexcept;
 
         inline void full_protocol(emp::NetIO& io, const Circuit& circuit, Bitset input) {
             input.resize(circuit.inputSize0);

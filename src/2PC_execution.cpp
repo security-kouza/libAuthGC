@@ -1,4 +1,5 @@
 #include <ATLab/2PC_execution.hpp>
+#include <ATLab/hash_wrapper.h>
 
 namespace ATLab {
     namespace Garbler {
@@ -8,7 +9,7 @@ namespace ATLab {
             const GarbledCircuit& gc,
             const PreprocessedData& wireMasks,
             const Bitset& input
-        ) {
+        ) noexcept {
             Bitset maskedValues;
             maskedValues.reserve(circuit.inputSize0);
             for (size_t w {0}; w != circuit.inputSize0; ++w) {
@@ -25,34 +26,28 @@ namespace ATLab {
             }
             io.send_data(garblerInputLabels.data(), garblerInputLabels.size() * sizeof(emp::block));
 
-            // send labels for evaluator's inputs
-            BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Sender::Get_simple_OT(io.role)};
-            std::vector<emp::block> evaluatorLabel0(circuit.inputSize1);
-            std::vector<emp::block> evaluatorLabel1(circuit.inputSize1);
-            for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
-                const bool garblerMaskShare {wireMasks.masks[wire]};
-                const auto& labelZero {gc.label0[wire]};
-                const auto& labelOne {gc.label1[wire]};
-                if (garblerMaskShare) {
-                    evaluatorLabel0[i] = labelOne;
-                    evaluatorLabel1[i] = labelZero;
-                } else {
-                    evaluatorLabel0[i] = labelZero;
-                    evaluatorLabel1[i] = labelOne;
+            if (circuit.inputSize1 != 0) {
+                // send labels for evaluator's inputs
+                BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Sender::Get_simple_OT(io.role)};
+                std::vector<emp::block> evaluatorLabel0(circuit.inputSize1);
+                std::vector<emp::block> evaluatorLabel1(circuit.inputSize1);
+                for (size_t i {0}; i != circuit.inputSize1; ++i) {
+                    const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
+                    const bool garblerMaskShare {wireMasks.masks[wire]};
+                    const auto& labelZero {gc.label0[wire]};
+                    const auto& labelOne {gc.label1[wire]};
+                    if (garblerMaskShare) {
+                        evaluatorLabel0[i] = labelOne;
+                        evaluatorLabel1[i] = labelZero;
+                    } else {
+                        evaluatorLabel0[i] = labelZero;
+                        evaluatorLabel1[i] = labelOne;
+                    }
                 }
-            }
-            ot.send(evaluatorLabel0.data(), evaluatorLabel1.data(), circuit.inputSize1);
+                ot.send(evaluatorLabel0.data(), evaluatorLabel1.data(), circuit.inputSize1);
 
-            // send masked values for evaluator's inputs
-            Bitset input1masks;
-            input1masks.reserve(circuit.inputSize1);
-            for (size_t i {circuit.inputSize0}; i != circuit.totalInputSize; ++i) {
-                input1masks.push_back(wireMasks.masks[i]);
+                wireMasks.masks.open(io, SHA256::hash_to_128, circuit.inputSize0, circuit.totalInputSize);
             }
-            const std::vector<BitsetBlock> rawInput1masks {dump_raw_blocks(input1masks)};
-            io.send_data(rawInput1masks.data(), rawInput1masks.size() * sizeof(BitsetBlock));
-            //TODO: macs
 
             Bitset outputMasks;
             outputMasks.reserve(circuit.outputSize);
@@ -83,20 +78,22 @@ namespace ATLab {
             std::vector<emp::block> inputLabels(circuit.totalInputSize);
             io.recv_data(inputLabels.data(), circuit.inputSize0 * sizeof(emp::block));
 
-            BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Receiver::Get_simple_OT(io.role)};
-            auto choices = std::make_unique<bool[]>(circuit.inputSize1);
-            for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
-                choices[i] = input[i] ^ wireMasks.masks[wire];
-            }
-            ot.recv(inputLabels.data() + circuit.inputSize0, choices.get(), static_cast<int64_t>(circuit.inputSize1));
+            if (circuit.inputSize1 != 0) {
+                // OT steps
+                BlockCorrelatedOT::OT& ot {BlockCorrelatedOT::Receiver::Get_simple_OT(io.role)};
+                auto choices = std::make_unique<bool[]>(circuit.inputSize1);
+                for (size_t i {0}; i != circuit.inputSize1; ++i) {
+                    const Wire wire {static_cast<Wire>(circuit.inputSize0 + i)};
+                    choices[i] = input[i] ^ wireMasks.masks[wire];
+                }
+                ot.recv(inputLabels.data() + circuit.inputSize0, choices.get(), static_cast<int64_t>(circuit.inputSize1));
 
-            std::vector<BitsetBlock> rawGarblerInput1Masks(calc_bitset_block(circuit.inputSize1));
-            io.recv_data(rawGarblerInput1Masks.data(), rawGarblerInput1Masks.size() * sizeof(BitsetBlock));
-            Bitset garblerInput1Masks {rawGarblerInput1Masks.begin(), rawGarblerInput1Masks.end()};
-            garblerInput1Masks.resize(circuit.inputSize1);
-            for (size_t i {0}; i != circuit.inputSize1; ++i) {
-                inputMaskedValues.push_back(choices[i] ^ garblerInput1Masks[i]);
+                const ITMacOpenedBits garblerInput1Masks {
+                    wireMasks.maskKeys.open(io, SHA256::hash_to_128, circuit.inputSize0, circuit.totalInputSize)
+                };
+                for (size_t i {0}; i != circuit.inputSize1; ++i) {
+                    inputMaskedValues.push_back(choices[i] ^ garblerInput1Masks.test(i));
+                }
             }
 
             const auto& [maskedValues, labels] {
