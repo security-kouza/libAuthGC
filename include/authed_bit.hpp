@@ -19,9 +19,8 @@ namespace ATLab {
         std::vector<emp::block> _blocks;
         const size_t _globalKeySize; // number of global keys
 
-        ITMacBlocks(std::vector<emp::block>&& blocks, std::vector<emp::block>&& macs, size_t globalKeySize);
-
     public:
+        ITMacBlocks(std::vector<emp::block>&& blocks, std::vector<emp::block>&& macs, size_t globalKeySize);
 
         /**
          * @param bits size must be 128 * blockSize
@@ -113,13 +112,13 @@ namespace ATLab {
         std::vector<emp::block> _localKeys; // flattened by global key then block index
         std::vector<emp::block> _globalKeys;
 
+    public:
         // Move localkeys only when globalKey with size 1
-        // private constructor, only used by the friend matrix multiplication
         ITMacBlockKeys(std::vector<emp::block>&& localKeys, const emp::block globalKey):
             _localKeys {std::move(localKeys)},
             _globalKeys {globalKey}
         {}
-    public:
+
         ITMacBlockKeys(const std::vector<emp::block>& localKeys, std::vector<emp::block> globalKeys):
             _globalKeys {std::move(globalKeys)}
         {
