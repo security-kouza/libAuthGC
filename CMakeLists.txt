@@ -72,6 +72,7 @@ set(HEADER
     include/ATLab/matrix.hpp
     include/ATLab/garble_evaluate.hpp
     include/ATLab/traits.hpp
+    include/ATLab/hash_wrapper.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})

@@ -12,6 +12,7 @@
 
 #include <authed_bit.hpp>
 #include "test-helper.hpp"
+#include "ATLab/hash_wrapper.h"
 
 TEST(Authed_Bit, random_bits) {
     constexpr size_t deltaSize {3};
@@ -300,13 +301,6 @@ TEST(Authed_Bit, open) {
     const ITMacBits authedBits {bits, std::move(macs)};
     const ITMacBitKeys keys {std::move(localKeys), {globalKey}};
 
-    auto hash {[&](const void* data, const size_t size) -> std::array<std::byte, 16> {
-        const emp::block hashBlock {emp::Hash::hash_for_block(data, size)};
-        std::array<std::byte, 16> res;
-        std::memcpy(res.data(), &hashBlock, sizeof(res));
-        return res;
-    }};
-
     constexpr size_t SLICE_BEGIN {1}, SLICE_END {bitSize};
 
     /**
@@ -317,33 +311,33 @@ TEST(Authed_Bit, open) {
      */
     std::thread senderThread {[&]() {
         auto& io {server_io()};
-        authedBits.open(io, hash);
-        authedBits.open(io, hash, SLICE_BEGIN, SLICE_END);
+        authedBits.open(io, SHA256::hash_to_128);
+        authedBits.open(io, SHA256::hash_to_128, SLICE_BEGIN, SLICE_END);
 
         std::vector<emp::block> randomMacs(bitSize);
         THE_GLOBAL_PRNG.random_block(randomMacs.data(), randomMacs.size());
         const ITMacBits fakeMacs {bits, std::move(randomMacs)};
-        fakeMacs.open(io, hash);
+        fakeMacs.open(io, SHA256::hash_to_128);
 
         io.flush();
     }}, receiverThread {[&]() {
         auto& io {client_io()};
         EXPECT_NO_THROW(
-            const ITMacOpenedBits opened {keys.open(io, hash)};
+            const ITMacOpenedBits opened {keys.open(io, SHA256::hash_to_128)};
             for (size_t i {0}; i != bitSize; ++i) {
                 EXPECT_EQ(bitArr[i], opened.test(i));
             }
         );
 
         EXPECT_NO_THROW(
-            const ITMacOpenedBits opened {keys.open(io, hash, SLICE_BEGIN, SLICE_END)};
+            const ITMacOpenedBits opened {keys.open(io, SHA256::hash_to_128, SLICE_BEGIN, SLICE_END)};
             for (size_t i {0}; i != SLICE_END - SLICE_BEGIN; ++i) {
                 EXPECT_EQ(bitArr[SLICE_BEGIN + i], opened.test(i));
             }
         );
 
         EXPECT_THROW(
-            keys.open(io, hash);
+            keys.open(io, SHA256::hash_to_128);
         , std::runtime_error);
         io.flush();
     }};
