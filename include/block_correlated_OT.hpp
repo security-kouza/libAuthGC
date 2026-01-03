@@ -25,6 +25,7 @@ namespace ATLab::BlockCorrelatedOT {
     using OT = emp::IKNP<emp::NetIO>;
 
     class Sender {
+        const std::vector<emp::block> _deltaArr;
 #if PARTY_INSTANCES_PER_THREAD == 1
         static std::unique_ptr<OT>& shared_ot_storage() {
             static std::unique_ptr<OT> instance;
@@ -73,7 +74,6 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-        const std::vector<emp::block> _deltaArr;
         const emp::NetIO::Role role;
         const size_t deltaArrSize;
         Sender(emp::NetIO& io, std::vector<emp::block> deltaArr) :

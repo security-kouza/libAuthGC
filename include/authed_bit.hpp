@@ -148,7 +148,7 @@ namespace ATLab {
          * Protocol interactions involved.
          * @param blockSize Number of blocks to generate.
          */
-        ITMacBlockKeys(BlockCorrelatedOT::Sender& bCOTSender, size_t blockSize);
+        ITMacBlockKeys(const BlockCorrelatedOT::Sender& bCOTSender, size_t blockSize);
 
         // `Fix` for blocks
         ITMacBlockKeys(emp::NetIO&, BlockCorrelatedOT::Sender&, size_t blockSize);
@@ -351,7 +351,7 @@ namespace ATLab {
          * _bits will not be available.
          * @param len Number of bits to generate.
          */
-        ITMacBitKeys(BlockCorrelatedOT::Sender& bCOTSender, const size_t len):
+        ITMacBitKeys(const BlockCorrelatedOT::Sender& bCOTSender, const size_t len):
             ITMacBitKeys {[&bCOTSender, len]() -> ITMacBitKeys {
                 return ITMacBitKeys {
                     bCOTSender.extend(len),

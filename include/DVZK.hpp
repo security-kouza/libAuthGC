@@ -87,7 +87,7 @@ namespace ATLab::DVZK {
         emp::block B_;
         std::unique_ptr<emp::PRG> _pChalGen;
     public:
-        Verifier(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender):
+        Verifier(emp::NetIO& io, const BlockCorrelatedOT::Sender& bCOTSender):
             delta_ {bCOTSender.get_delta(0)},
             _authedBlockKey {ITMacBlockKeys{bCOTSender, 1}},
             B_ {_authedBlockKey.get_local_key(0, 0)}

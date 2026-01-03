@@ -186,7 +186,7 @@ namespace ATLab {
     }
 
     ITMacBlockKeys::ITMacBlockKeys(
-        BlockCorrelatedOT::Sender& bCOTSender,
+        const BlockCorrelatedOT::Sender& bCOTSender,
         size_t blockSize
     ):
         ITMacBlockKeys {
