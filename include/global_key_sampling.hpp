@@ -12,6 +12,7 @@
 #include "block_correlated_OT.hpp"
 #include "DVZK.hpp"
 #include "params.hpp"
+#include "ATLab/util_protocols.hpp"
 
 namespace ATLab::GlobalKeySampling {
     // PA
@@ -95,17 +96,18 @@ namespace ATLab::GlobalKeySampling {
             }
 
             // f, g
-            const emp::block toHash {_mm_xor_si128(deltaBKey.get_local_key(0, 0), authedDeltaA.get_mac(0, 0))};
-            std::array<uint8_t, DIGEST_SIZE> hashRes {};
-            emp::Hash::hash_once(hashRes.data(), &toHash, sizeof(toHash));
-            std::array<uint8_t, HALF_DIGEST_SIZE> lowHash {};
-            io.send_data(hashRes.data(), HALF_DIGEST_SIZE);
-            io.recv_data(lowHash.data(), HALF_DIGEST_SIZE);
-
-            const auto expectedLow {
-                *reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data() + HALF_DIGEST_SIZE)
-            };
-            if (expectedLow != lowHash) {
+            const emp::block toCompare {_mm_xor_si128(deltaBKey.get_local_key(0, 0), authedDeltaA.get_mac(0, 0))};
+            // std::array<uint8_t, DIGEST_SIZE> hashRes {};
+            // emp::Hash::hash_once(hashRes.data(), &toCompare, sizeof(toCompare));
+            // std::array<uint8_t, HALF_DIGEST_SIZE> lowHash {};
+            // io.send_data(hashRes.data(), HALF_DIGEST_SIZE);
+            // io.recv_data(lowHash.data(), HALF_DIGEST_SIZE);
+            //
+            // const auto expectedLow {
+            //     *reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data() + HALF_DIGEST_SIZE)
+            // };
+            // if (expectedLow != lowHash) {
+            if (compare_hash_low(io, &toCompare, sizeof(toCompare))) {
                 throw std::runtime_error{"ΔB not consistent"};
             }
         }
@@ -202,15 +204,16 @@ namespace ATLab::GlobalKeySampling {
             io.send_data(&lsbsOfYDeltaAKeys, sizeof(lsbsOfYDeltaAKeys));
 
             // f, g
-            const emp::block toHash {_mm_xor_si128(deltaAKey.get_local_key(0, 0), authedDeltaB.get_mac(0, 0))};
-            std::array<uint8_t, DIGEST_SIZE> hashRes {};
-            emp::Hash::hash_once(hashRes.data(), &toHash, sizeof(toHash));
-            std::array<uint8_t, HALF_DIGEST_SIZE> highHash {};
-            io.send_data(hashRes.data() + HALF_DIGEST_SIZE, HALF_DIGEST_SIZE);
-            io.recv_data(highHash.data(), HALF_DIGEST_SIZE);
-
-            const auto expectedHigh {*reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data())};
-            if (expectedHigh != highHash) {
+            const emp::block toCompare {_mm_xor_si128(deltaAKey.get_local_key(0, 0), authedDeltaB.get_mac(0, 0))};
+            // std::array<uint8_t, DIGEST_SIZE> hashRes {};
+            // emp::Hash::hash_once(hashRes.data(), &toCompare, sizeof(toCompare));
+            // std::array<uint8_t, HALF_DIGEST_SIZE> highHash {};
+            // io.send_data(hashRes.data() + HALF_DIGEST_SIZE, HALF_DIGEST_SIZE);
+            // io.recv_data(highHash.data(), HALF_DIGEST_SIZE);
+            //
+            // const auto expectedHigh {*reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data())};
+            // if (expectedHigh != highHash) {
+            if (compare_hash_low(io, &toCompare, sizeof(toCompare))) {
                 throw std::runtime_error{"ΔA not consistent"};
             }
         }

@@ -56,6 +56,7 @@ set(SRC
     src/garble_evaluate.cpp
     src/2PC_execution.cpp
     src/gc_check.cpp
+    src/util_protocols.cpp
 )
 set(HEADER
     include/socket.hpp
@@ -73,6 +74,7 @@ set(HEADER
     include/ATLab/garble_evaluate.hpp
     include/ATLab/traits.hpp
     include/ATLab/hash_wrapper.h
+    include/ATLab/util_protocols.hpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRC} ${HEADER})
