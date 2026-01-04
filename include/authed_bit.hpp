@@ -248,6 +248,7 @@ namespace ATLab {
         }
 
         size_t global_key_size() const {
+            assert(_bits.size() != 0);
             return _macs.size() / _bits.size();
         }
 

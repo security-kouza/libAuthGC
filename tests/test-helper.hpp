@@ -34,16 +34,18 @@ inline void test_ITMacBits(
         const auto& keys {*keysPtr};
 
         EXPECT_EQ(bits.size(), keys.size());
-        EXPECT_EQ(bits.global_key_size(), keys.global_key_size());
-        const size_t globalKeySize {bits.global_key_size()};
+        if (bits.size()) {
+            EXPECT_EQ(bits.global_key_size(), keys.global_key_size());
+            const size_t globalKeySize {bits.global_key_size()};
 
-        for (size_t i = 0; i < globalKeySize; ++i) {
-            for (size_t j = 0; j < bits.size(); ++j) {
-                emp::block expected = keys.get_local_key(i, j);
-                if (bits.at(j)) {
-                    expected = expected ^ keys.get_global_key(i);
+            for (size_t i = 0; i < globalKeySize; ++i) {
+                for (size_t j = 0; j < bits.size(); ++j) {
+                    emp::block expected = keys.get_local_key(i, j);
+                    if (bits.at(j)) {
+                        expected = expected ^ keys.get_global_key(i);
+                    }
+                    EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits.get_mac(i, j)));
                 }
-                EXPECT_EQ(ATLab::as_uint128(expected), ATLab::as_uint128(bits.get_mac(i, j)));
             }
         }
     }

@@ -27,8 +27,8 @@ namespace {
     public:
         explicit SparseBitMatrix(const size_t size) {
             // For `size` length bit string, each bit is 1 with probability 1/4
-            // To reach best performance, setting the load factor to be 0.7
-            // 1 / (4 * 0.7) is about 0.36
+            // To reach the best performance, setting the load factor as 0.7
+            // 1 / (4 * 0.7) ≈ 0.36
             _map.reserve(static_cast<size_t>(static_cast<double>(size) * 0.36));
         }
 
@@ -93,16 +93,20 @@ namespace {
     Matrix<bool> get_matrix(emp::NetIO& io, const size_t n, const size_t L) {
         const size_t blockSize {calc_matrix_blockSize(n, L)}; // TODO: Change to Total_block_count
         std::vector<MatrixBlock> rawData(blockSize);
-        io.recv_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        if (blockSize != 0) {
+            io.recv_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        }
         return {n, L, std::move(rawData)};
     }
 
     Matrix<bool> gen_and_send_matrix(emp::NetIO& io, const size_t n, const size_t L) {
         const size_t blockSize {calc_matrix_blockSize(n, L)};
         std::vector<MatrixBlock> rawData(blockSize);
-        THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
-        zero_matrix_row_padding(rawData, n, L);
-        io.send_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        if (blockSize != 0) {
+            THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+            zero_matrix_row_padding(rawData, n, L);
+            io.send_data(rawData.data(), rawData.size() * sizeof(MatrixBlock));
+        }
         return {n, L, std::move(rawData)};
     }
 

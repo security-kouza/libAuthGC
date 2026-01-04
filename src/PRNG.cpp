@@ -70,6 +70,10 @@ namespace ATLab {
     }
 
     Bitset random_dynamic_bitset(const size_t bitSize) {
+        if (bitSize == 0) {
+            return {};
+        }
+
         const size_t blockSize {calc_bitset_blockSize(bitSize)};
         std::vector<BitsetBlock> rawData(blockSize);
         THE_GLOBAL_PRNG.random_data(rawData.data(), rawData.size() * sizeof(BitsetBlock));
