@@ -32,7 +32,7 @@ namespace ATLab::DVZK {
         // authedBlocks[0] * authedBlocks[1] == authedBlocks[2]
         void update(const std::array<emp::block, 3>& authedBlocks, const std::array<emp::block, 3>& macs) noexcept {
             assert(as_uint128(authedBlocks[2]) == as_uint128(
-                detail::gf_mul_block(authedBlocks[0], authedBlocks[1]))
+                gf_mul_block(authedBlocks[0], authedBlocks[1]))
             );
 
             emp::block challenge;

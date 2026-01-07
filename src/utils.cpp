@@ -99,4 +99,29 @@ namespace ATLab {
         encoder.packing(&res, coeff);
         return res;
     }
+
+    emp::block gf_inverse(const emp::block& x) {
+        const emp::block kOne {_mm_set_epi64x(0, 1)};
+        auto square {[](const emp::block& value) {
+            return gf_mul_block(value, value);
+        }};
+        auto square_times {[&square](emp::block value, const size_t times) {
+            for (size_t i {0}; i < times; ++i) {
+                value = square(value);
+            }
+            return value;
+        }};
+
+        emp::block minusOne {x}; // x^{2^1 - 1}
+        emp::block minusTwo {kOne}; // x^{2^1 - 2} = 1
+
+        for (size_t k {1}; k < 128; k <<= 1) {
+            const emp::block powered {square_times(minusOne, k)};
+            minusOne = gf_mul_block(powered, minusOne);
+            minusTwo = gf_mul_block(powered, minusTwo);
+        }
+
+        return minusTwo;
+    }
 }
+

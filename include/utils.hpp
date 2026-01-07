@@ -139,13 +139,13 @@ namespace ATLab {
         return (static_cast<__uint128_t>(hi) << 64) | lo;
     }
 
-    namespace detail {
-        inline emp::block gf_mul_block(const emp::block& lhs, const emp::block& rhs) {
-            emp::block out;
-            emp::gfmul(lhs, rhs, &out);
-            return out;
-        }
+    inline emp::block gf_mul_block(const emp::block& lhs, const emp::block& rhs) {
+        emp::block out;
+        emp::gfmul(lhs, rhs, &out);
+        return out;
+    }
 
+    namespace detail {
         template <size_t... Indices>
         inline emp::block vector_inner_product_impl(const emp::block* a, const emp::block* b, std::index_sequence<Indices...>) {
             emp::block accumulator = emp::zero_block;
@@ -168,6 +168,8 @@ namespace ATLab {
      * @param coeff Pointer to an array of 128 coefficients. Little-endian required (coeff[i] * X^i).
      */
     emp::block polyval(const emp::block* coeff);
+
+    emp::block gf_inverse(const emp::block& x);
 
     inline bool get_LSB(const __m128i& x) {
         // Fast when the __V is already in a XMM register.
