@@ -2,9 +2,12 @@
 
 #include "authed_bit.hpp"
 
+#include "ATLab/hash_wrapper.h"
+#include "ATLab/util_protocols.hpp"
+
 namespace ATLab {
     namespace {
-        Bitset blocks_to_bool_vector(const std::vector<emp::block>& blocks) {
+        Bitset blocks_to_bool_vector(const boost::span<emp::block>& blocks) {
             const size_t totalBits {blocks.size() * BLOCK_BIT_SIZE};
             Bitset bits(totalBits);
             size_t offset {0};
@@ -72,17 +75,32 @@ namespace ATLab {
         std::vector<emp::block>&& blocks,
         std::vector<emp::block>&& macs,
         const size_t globalKeySize
-    ):
+    ) noexcept:
         _macs {std::move(macs)},
         _blocks {std::move(blocks)},
         _globalKeySize {globalKeySize}
     {
-        if (_blocks.empty() || !_globalKeySize) {
-            throw std::invalid_argument{"Empty argument"};
-        }
-        if (_macs.size() != _blocks.size() * _globalKeySize) {
-            throw std::invalid_argument{"Wrong parameter sizes."};
-        }
+        assert(!_blocks.empty());
+        assert(_globalKeySize != 0);
+        assert(_macs.size() == _blocks.size() * _globalKeySize);
+    }
+
+    ITMacBlocks::ITMacBlocks(
+        const boost::span<const emp::block> blocks,
+        const boost::span<const emp::block> macs,
+        const size_t globalKeySize
+    ) noexcept:
+        _globalKeySize {globalKeySize}
+    {
+        assert(!blocks.empty());
+        assert(_globalKeySize != 0);
+        assert(macs.size() == blocks.size() * _globalKeySize);
+
+        _blocks.reserve(blocks.size());
+        _macs.reserve(macs.size());
+
+        std::copy_n(blocks.cbegin(), blocks.size(), std::back_inserter(_blocks));
+        std::copy_n(macs.cbegin(), macs.size(), std::back_inserter(_macs));
     }
 
     ITMacBlocks::ITMacBlocks(
@@ -125,7 +143,7 @@ namespace ATLab {
 
     ITMacBlocks::ITMacBlocks(
         emp::NetIO& io,
-        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
         std::vector<emp::block> blocksToAuth
     ):
         ITMacBlocks {
@@ -151,9 +169,42 @@ namespace ATLab {
         }
     {}
 
+    ITMacBlocks::ITMacBlocks(
+        emp::NetIO& io,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
+        boost::span<const emp::block> blocksToAuth
+    ):
+        ITMacBlocks {
+            [&io, &bCOTReceiver, blocksToAuth]() {
+                std::vector<emp::block> blockVec;
+                blockVec.reserve(blocksToAuth.size());
+                std::copy_n(blocksToAuth.cbegin(), blocksToAuth.size(), std::back_inserter(blockVec));
+
+                return ITMacBlocks{io, bCOTReceiver, blockVec};
+            }()
+        }
+    {}
+
+    ITMacBlockKeys ITMacBlocks::swap_value_and_key(const size_t globalKeyPos, const size_t blockPos) const noexcept {
+        const auto& newGlobalKey {get_block(blockPos)};
+        const auto& newLocalKey {get_mac(globalKeyPos, blockPos)};
+
+        return {{newLocalKey}, newGlobalKey};
+    }
+
+    ITMacBlockKeys ITMacBlocks::swap_value_and_key() && noexcept {
+        assert(size() == 1);
+
+        return {std::move(_macs), _blocks.front()};
+    }
+
+    void ITMacBlocks::inverse_value_and_mac() noexcept {
+        std::swap(_macs, _blocks);
+    }
+
     ITMacScaledBits::ITMacScaledBits(
         emp::NetIO& io,
-        BlockCorrelatedOT::Receiver& bCOTReceiver,
+        const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const emp::block& scalarBlock,
         const Bitset& blockSelectors
     ):
@@ -185,6 +236,7 @@ namespace ATLab {
         _macs = polyval_mac_chunks(fixedBits._macs.data(), totalBits, globalKeySize, blockCount);
     }
 
+    // Constructor for a random block
     ITMacBlockKeys::ITMacBlockKeys(
         const BlockCorrelatedOT::Sender& bCOTSender,
         size_t blockSize
@@ -199,9 +251,10 @@ namespace ATLab {
         }
     {}
 
+    // Constructor for a fixed block
     ITMacBlockKeys::ITMacBlockKeys(
         emp::NetIO& io,
-        BlockCorrelatedOT::Sender& bCOTSender,
+        const BlockCorrelatedOT::Sender& bCOTSender,
         size_t blockSize
     ):
         ITMacBlockKeys {
@@ -214,6 +267,99 @@ namespace ATLab {
         }
     {}
 
+    ITMacBlocks ITMacBlockKeys::swap_value_and_key(const size_t globalKeyPos, const size_t blockPos) const noexcept {
+        const emp::block newBlock {get_global_key(globalKeyPos)}, newMac {get_local_key(globalKeyPos, blockPos)};
+        return {{newBlock}, {newMac}, 1};
+    }
+
+    ITMacBlocks ITMacBlockKeys::swap_value_and_key() && noexcept {
+        assert(size() == 1);
+        return {std::move(_globalKeys), std::move(_localKeys), 1};
+    }
+
+    void ITMacBlockKeys::inverse_value_and_mac() noexcept {
+        for (size_t i {0}; i != global_key_size(); ++i) {
+            _globalKeys[i] = gf_inverse(_globalKeys[i]);
+            boost::span localKeys {_localKeys.data() + i * size(), size()};
+            for (emp::block& key : localKeys) {
+                key = gf_mul_block(key, _globalKeys[i]);
+            }
+        }
+    }
+
+    bool check_same_bit(emp::NetIO& io, const ITMacBlockKeySpan& key0, const ITMacBlockKeySpan& key1) noexcept {
+        assert(key0.size() == 1);
+        assert(key1.size() == 1);
+        const emp::block toCompare {_mm_xor_si128(key0.get_local_key(0), key1.get_local_key(0))};
+        return compare_hash_high(io, &toCompare, sizeof(toCompare));
+    }
+
+    bool check_same_bit(emp::NetIO& io, const ITMacBlockSpan& block0, const ITMacBlockSpan& block1) noexcept {
+        assert(block0.size() == 1);
+        assert(block1.size() == 1);
+        const emp::block toCompare {_mm_xor_si128(block0.get_mac(0), block1.get_mac(0))};
+        return compare_hash_low(io, &toCompare, sizeof(toCompare));
+    }
+
+    void eqcheck_diff_key(
+        emp::NetIO& io,
+        const ITMacBlockSpan& authedBlocks0,
+        const ITMacBlockSpan& authedBlocks1
+    ) noexcept {
+        assert(authedBlocks0.size() == authedBlocks1.size());
+        const size_t size {authedBlocks0.size()};
+
+        const BlockCorrelatedOT::Receiver bCOTKey0 {io, 1};
+        const ITMacBlocks authedMacs1 {io, bCOTKey0, authedBlocks1.mac_span()};
+
+        const BlockCorrelatedOT::Receiver bCOTKey1 {io, 1};
+        const ITMacBlocks authedMacs0 {io, bCOTKey1, authedBlocks0.mac_span()};
+
+        std::vector<ITMacBlocks::MacType> toHash;
+        toHash.reserve(size);
+        for (size_t i = 0; i < size; i++) {
+            toHash.push_back(_mm_xor_si128(authedMacs0.get_mac(0, i), authedMacs1.get_mac(0, i)));
+        }
+        const auto hashRes {SHA256::hash_to_128(toHash.data(), toHash.size())};
+        io.send_data(&hashRes, sizeof(hashRes));
+    }
+
+    void eqcheck_diff_key(
+        emp::NetIO& io,
+        const ITMacBlockKeySpan& authedBlocks0,
+        const ITMacBlockKeySpan& authedBlocks1
+    ) {
+        assert(authedBlocks0.size() == authedBlocks1.size());
+        const size_t size {authedBlocks0.size()};
+        const auto& gk0 {authedBlocks0.global_key()}, gk1 {authedBlocks1.global_key()};
+
+        const BlockCorrelatedOT::Sender bCOTKey0 {io, {authedBlocks0.global_key()}};
+        const ITMacBlockKeys authedMacs1 {io, bCOTKey0, size};
+
+        const BlockCorrelatedOT::Sender bCOTKey1 {io, {authedBlocks1.global_key()}};
+        const ITMacBlockKeys authedMacs0 {io, bCOTKey1, size};
+
+        std::vector<ITMacBlocks::MacType> toHash;
+        toHash.reserve(size);
+        for (size_t i = 0; i < size; i++) {
+            emp::block newTerm {
+                _mm_xor_si128(authedMacs0.get_local_key(0, i), authedMacs1.get_local_key(0, i))
+            };
+            emp::block tmp;
+            emp::gfmul(authedBlocks0.get_local_key(i), gk1, &tmp);
+            xor_to(newTerm, tmp);
+            emp::gfmul(authedBlocks1.get_local_key(i), gk0, &tmp);
+            xor_to(newTerm, tmp);
+            toHash.push_back(newTerm);
+        }
+        const auto hashRes {SHA256::hash_to_128(toHash.data(), toHash.size())};
+        std::array<std::byte, 16> expectedHash {};
+        io.recv_data(&expectedHash, sizeof(expectedHash));
+
+        if (hashRes != expectedHash) {
+            throw std::runtime_error{"Malicious behavior detected."};
+        }
+    }
 
 }
 

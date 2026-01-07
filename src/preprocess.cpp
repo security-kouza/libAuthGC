@@ -7,8 +7,6 @@
 #include <ATLab/benchmark.hpp>
 #include "global_key_sampling.hpp"
 
-// TODO: n, L need names
-
 namespace {
     using namespace ATLab;
 
@@ -250,6 +248,15 @@ namespace {
             std::move(andedMasks)
         };
     }
+
+    std::vector<emp::block> gen_chal_by_power(const emp::block& seed, const size_t size) {
+        std::vector<emp::block> chal(size);
+        chal[0] = seed;
+        for (size_t i {1}; i != size; ++i) {
+            emp::gfmul(seed, chal[i - 1], &chal[i]);
+        }
+        return chal;
+    }
 }
 
 namespace ATLab {
@@ -271,7 +278,7 @@ namespace ATLab {
             auto bKeys {matrix * bStarKeys};
 
             // 3
-            const ITMacBlockKeys dualAuthedBStar{io, globalKey.get_COT_sender(), compressParam};
+            ITMacBlockKeys dualAuthedBStar{io, globalKey.get_COT_sender(), compressParam};
 
             // 4
             BlockCorrelatedOT::Receiver sid1 {io, compressParam + 1};
@@ -279,7 +286,7 @@ namespace ATLab {
 
             emp::block tmpDelta;
             THE_GLOBAL_PRNG.random_block(&tmpDelta, 1);
-            const ITMacBlocks authedTmpDelta {io, sid1, {tmpDelta}};
+            ITMacBlocks authedTmpDelta {io, sid1, {tmpDelta}};
 
             // 5
             BlockCorrelatedOT::Receiver sid2 {io, 2};
@@ -287,8 +294,8 @@ namespace ATLab {
             const ITMacBlocks authedTmpDeltaStep5 {io, sid2, {tmpDelta}};
 
             // 6
-            auto [masks, maskKeys, andedMasks_nonconst] {populate_wires_garbler(circuit, aMatrix, bKeys, compressParam)};
-            const auto& andedMasks {andedMasks_nonconst};
+            auto populated {populate_wires_garbler(circuit, aMatrix, bKeys, compressParam)};
+            const auto& andedMasks {populated.andedMasks};
 
             // 7
             const ITMacBitKeys evaluatorAndedMasks {io, globalKey.get_COT_sender(), circuit.andGateSize};
@@ -337,40 +344,97 @@ BENCHMARK_END(G step 9);
             /**
              * Consistency check
              */
-
-            DVZK::Prover prover {io, {io, 1}};
-            DVZK::Verifier verifier {io, globalKey.get_COT_sender()};
-            circuit.for_each_AND_gate([&](const Gate& gate, const size_t andGateOrder) -> void {
-                prover.update(std::array<bool, 3>{
-                    masks.at(gate.in0),
-                    masks.at(gate.in1),
-                    authedAndedMasks.at(andGateOrder)
-                }, {
-                    masks.get_mac(0, gate.in0),
-                    masks.get_mac(0, gate.in1),
-                    authedAndedMasks.get_mac(1 /* ΔB is the second key */, andGateOrder)
+            auto check_delta {[&]() -> void {
+                DVZK::Prover prover {io, {io, 1}};
+                DVZK::Verifier verifier {io, globalKey.get_COT_sender()};
+                circuit.for_each_AND_gate([&](const Gate& gate, const size_t andGateOrder) -> void {
+                    const auto& masks {populated.masks};
+                    const auto& maskKeys {populated.keys};
+                    prover.update(std::array<bool, 3>{
+                        masks.at(gate.in0),
+                        masks.at(gate.in1),
+                        authedAndedMasks.at(andGateOrder)
+                    }, {
+                        masks.get_mac(0, gate.in0),
+                        masks.get_mac(0, gate.in1),
+                        authedAndedMasks.get_mac(1 /* ΔB is the second key */, andGateOrder)
+                    });
+                    verifier.update({
+                        maskKeys.get_local_key(0, gate.in0),
+                        maskKeys.get_local_key(0, gate.in1),
+                        evaluatorAndedMasks.get_local_key(0, andGateOrder)
+                    });
                 });
-                verifier.update({
-                    maskKeys.get_local_key(0, gate.in0),
-                    maskKeys.get_local_key(0, gate.in1),
-                    evaluatorAndedMasks.get_local_key(0, andGateOrder)
-                });
-            });
-            prover.prove(io);
-            verifier.verify(io);
+                prover.prove(io);
+                verifier.verify(io);
 
-            DVZK::verify(
-                io,
-                globalKey.get_COT_sender(),
-                bStarKeys,
-                {{globalKey.get_alpha_0()}, globalKey.get_delta()},
-                dualAuthedBStar,
-                compressParam
-            );
+                DVZK::verify(
+                    io,
+                    globalKey.get_COT_sender(),
+                    bStarKeys,
+                    {{globalKey.get_alpha_0()}, globalKey.get_delta()},
+                    dualAuthedBStar,
+                    compressParam
+                );
+
+                BlockCorrelatedOT::Sender sid3 {io, {tmpDelta}};
+                const ITMacBlockKeys betaByTmpDelta {std::move(authedTmpDelta).swap_value_and_key()};
+                const ITMacBlockKeySpan toCheck1 {betaByTmpDelta, 0, compressParam, compressParam + 1};
+                const ITMacBlockKeys
+                    toCheck2 {authedTmpDeltaStep5.swap_value_and_key(1, 0)},
+                    toCheck3 {io, sid3, 1};
+                if (!(check_same_bit(io, toCheck1, toCheck2) && check_same_bit(io, toCheck2, toCheck3))) {
+                    throw std::runtime_error{"Malicious behavior detected."};
+                }
+                eqcheck_diff_key(io, ITMacBlockKeys{
+                    {globalKey.get_alpha_0()}, globalKey.get_delta()
+                }, toCheck3);
+
+                dualAuthedBStar.inverse_value_and_mac();
+                eqcheck_diff_key(io, dualAuthedBStar, {
+                    betaByTmpDelta, 0, 0, compressParam
+                });
+            }};
+            check_delta();
+
+            auto check_beaver_triple{[&]() -> void {
+                const ITMacBlockKeys authedR {globalKey.get_COT_sender(), 1};
+                ITMacBlockKeys dualR {io, globalKey.get_COT_sender(), 1};
+
+                const emp::block seed {toss_random_block(io)};
+                const std::vector<emp::block> chal {gen_chal_by_power(seed, circuit.andGateSize)};
+
+                emp::block dauthedY;
+                emp::vector_inn_prdt_sum_red(&dauthedY, chal.data(), tmpBeaverTriple.data(), circuit.andGateSize);
+                xor_to(dauthedY, dualR.get_local_key(0, 0));
+
+                emp::block y;
+                io.recv_data(&y, sizeof(y));
+
+                const emp::block toCompare {_mm_xor_si128(dauthedY, gf_mul_block(y, globalKey.get_alpha_0()))};
+                compare_hash_high(io, &toCompare, sizeof(toCompare));
+
+                std::vector<emp::block> keyVec;
+                keyVec.reserve(circuit.andGateSize);
+                for (size_t i {0}; i != circuit.andGateSize; ++i) {
+                    keyVec.push_back(_mm_xor_si128(
+                        beaverTripleKeys.get_local_key(0, i),
+                        evaluatorAndedMasks.get_local_key(0, i)
+                    ));
+                }
+                emp::block key;
+                emp::vector_inn_prdt_sum_red(&key, chal.data(), keyVec.data(), circuit.andGateSize);
+                xor_to(key, authedR.get_local_key(0, 0));
+                xor_to(key, gf_mul_block(y, globalKey.get_delta()));
+                compare_hash_high(io, &key, sizeof(key));
+            }};
+            if (circuit.andGateSize) {
+                check_beaver_triple();
+            }
 
             return {
-                std::move(masks),
-                std::move(maskKeys),
+                std::move(populated.masks),
+                std::move(populated.keys),
                 beaverTripleShares.extract_by_global_key(1),
                 std::move(beaverTripleKeys)
             };
@@ -422,8 +486,9 @@ BENCHMARK_END(E step 5);
 
 BENCHMARK_START
             // 6
-            auto [masks, maskKeys, andedMasks_nonconst] {populate_wires_evaluator(circuit, b, aMatrix, compressParam)};
-            const auto& andedMasks {andedMasks_nonconst};
+            // auto [masks, maskKeys, andedMasks_nonconst] {populate_wires_evaluator(circuit, b, aMatrix, compressParam)};
+            auto populated {populate_wires_evaluator(circuit, b, aMatrix, compressParam)};
+            const auto& andedMasks {populated.andedMasks};
 BENCHMARK_END(E step 6);
 
 BENCHMARK_START
@@ -479,40 +544,108 @@ BENCHMARK_END(E step 10)
             /**
              * Consistency check
              */
+            auto check_delta {[&]() -> void {
+                DVZK::Verifier verifier {io, {io, {globalKey.get_delta()}}};
+                DVZK::Prover prover {io, globalKey.get_COT_receiver()};
+                circuit.for_each_AND_gate([&](const Gate& gate, const size_t andGateOrder) -> void {
+                    const auto& masks {populated.masks};
+                    const auto& maskKeys {populated.keys};
 
-            DVZK::Verifier verifier {io, {io, {globalKey.get_delta()}}};
-            DVZK::Prover prover {io, globalKey.get_COT_receiver()};
-            circuit.for_each_AND_gate([&](const Gate& gate, const size_t andGateOrder) -> void {
-                verifier.update({
-                    maskKeys.get_local_key(0, gate.in0),
-                    maskKeys.get_local_key(0, gate.in1),
-                    garblerAndedMasks.get_local_key(1, andGateOrder)
+                    verifier.update({
+                        maskKeys.get_local_key(0, gate.in0),
+                        maskKeys.get_local_key(0, gate.in1),
+                        garblerAndedMasks.get_local_key(1, andGateOrder)
+                    });
+                    prover.update(std::array<bool, 3>{
+                        masks.at(gate.in0),
+                        masks.at(gate.in1),
+                        authedAndedMasks.at(andGateOrder)
+                    }, {
+                        masks.get_mac(0, gate.in0),
+                        masks.get_mac(0, gate.in1),
+                        authedAndedMasks.get_mac(0, andGateOrder)
+                    });
                 });
-                prover.update(std::array<bool, 3>{
-                    masks.at(gate.in0),
-                    masks.at(gate.in1),
-                    authedAndedMasks.at(andGateOrder)
-                }, {
-                    masks.get_mac(0, gate.in0),
-                    masks.get_mac(0, gate.in1),
-                    authedAndedMasks.get_mac(0, andGateOrder)
-                });
-            });
-            verifier.verify(io);
-            prover.prove(io);
+                verifier.verify(io);
+                prover.prove(io);
 
-            DVZK::prove(
-                io,
-                globalKey.get_COT_receiver(),
-                bStar,
-                {{globalKey.get_delta()}, {globalKey.get_beta_0()}, 1},
-                dualAuthedBStar,
-                compressParam
-            );
+                DVZK::prove(
+                    io,
+                    globalKey.get_COT_receiver(),
+                    bStar,
+                    {{globalKey.get_delta()}, {globalKey.get_beta_0()}, 1},
+                    dualAuthedBStar,
+                    compressParam
+                );
+
+                BlockCorrelatedOT::Receiver sid3 {io, 1};
+
+                const ITMacBlocks betaByTmpDelta {std::move(tmpDelta).swap_value_and_key()};
+
+                const ITMacBlockSpan toCheck1 {betaByTmpDelta, 0, compressParam, compressParam + 1};
+                const ITMacBlocks
+                    toCheck2 {tmpDeltaStep5.swap_value_and_key(1, 0)},
+                    toCheck3 {io, sid3, {globalKey.get_delta()}};
+
+                if (!(check_same_bit(io, toCheck1, toCheck2) && check_same_bit(io, toCheck2, toCheck3))) {
+                    throw std::runtime_error{"Malicious behavior detected."};
+                }
+
+                eqcheck_diff_key(io, ITMacBlocks{
+                    {globalKey.get_delta()}, {globalKey.get_beta_0()}, 1
+                }, toCheck3);
+
+                dualAuthedBStar.inverse_value_and_mac();
+                eqcheck_diff_key(io, dualAuthedBStar, {
+                    betaByTmpDelta, 0, 0, compressParam
+                });
+            }};
+            check_delta();
+
+            auto check_beaver_triple{[&]() -> void {
+                const ITMacBlocks authedR {globalKey.get_COT_receiver(), 1};
+
+                const ITMacBlocks dualR {io, globalKey.get_COT_receiver(), {
+                    gf_mul_block(authedR.get_block(0), globalKey.get_delta())
+                }};
+
+                const emp::block seed {toss_random_block(io)};
+                const std::vector<emp::block> chal {gen_chal_by_power(seed, circuit.andGateSize)};
+
+                emp::block dauthedY;
+                emp::vector_inn_prdt_sum_red(&dauthedY, chal.data(), tmpBeaverTriple.data(), circuit.andGateSize);
+                xor_to(dauthedY, dualR.get_mac(0, 0));
+
+                emp::block y {authedR.get_block(0)};
+                for (size_t i {0}; i != circuit.andGateSize; ++i) {
+                    xor_to(y, and_all_bits(tmpBeaverTripleLsb.at(i), chal.at(i)));
+                }
+
+                const emp::block toCompare {_mm_xor_si128(dauthedY, gf_mul_block(y, globalKey.get_beta_0()))};
+                io.send_data(&y, sizeof(y));
+                compare_hash_low(io, &toCompare, sizeof(toCompare));
+
+                std::vector<emp::block> macVec;
+                macVec.reserve(circuit.andGateSize);
+                for (size_t i {0}; i != circuit.andGateSize; ++i) {
+                    macVec.push_back(_mm_xor_si128(
+                        authedBeaverTriple.get_mac(0, i),
+                        authedAndedMasks.get_mac(0, i)
+                    ));
+                }
+                emp::block mac;
+                emp::vector_inn_prdt_sum_red(&mac, chal.data(), macVec.data(), circuit.andGateSize);
+                xor_to(mac, authedR.get_mac(0, 0));
+                compare_hash_low(io, &mac, sizeof(mac));
+            }};
+            if (circuit.andGateSize) {
+                check_beaver_triple();
+            }
+
 
             return {
-                std::move(masks),
-                std::move(maskKeys),
+                std::move(populated.masks),
+                std::move(populated.keys),
                 std::move(authedBeaverTriple),
                 beaverTripleKeys.extract_by_global_key(1)
             };

@@ -5,22 +5,39 @@
 #include <stdexcept>
 #include <vector>
 #include <boost/bind/bind.hpp>
+#include <boost/core/span.hpp>
 
 #include <emp-tool/utils/block.h>
 
+#include "authed_bit.hpp"
 #include "params.hpp"
 #include "block_correlated_OT.hpp"
 #include "ATLab/matrix.hpp"
 #include "ATLab/traits.hpp"
 
 namespace ATLab {
+    class ITMacBlockKeys;
+    class ITMacBlockSpan;
+    class ITMacBlockKeySpan;
+
     class ITMacBlocks {
-        std::vector<emp::block> _macs; // flattened by global key then block index
+        friend class ITMacBlockSpan;
+    public:
+        using MacType = emp::block;
+
+    private:
+        std::vector<MacType> _macs; // flattened by global key then block index
         std::vector<emp::block> _blocks;
         const size_t _globalKeySize; // number of global keys
 
     public:
-        ITMacBlocks(std::vector<emp::block>&& blocks, std::vector<emp::block>&& macs, size_t globalKeySize);
+        ITMacBlocks(std::vector<emp::block>&& blocks, std::vector<emp::block>&& macs, size_t globalKeySize) noexcept;
+
+        ITMacBlocks(
+            boost::span<const emp::block> blocks,
+            boost::span<const emp::block> macs,
+            size_t globalKeySize
+        ) noexcept;
 
         /**
          * @param bits size must be 128 * blockSize
@@ -36,7 +53,10 @@ namespace ATLab {
         ITMacBlocks(const BlockCorrelatedOT::Receiver& bCOTReceiver, size_t blockSize);
 
         // `Fix` for blocks
-        ITMacBlocks(emp::NetIO&, BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
+        ITMacBlocks(emp::NetIO&, const BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
+
+        // `Fix` for blocks
+        ITMacBlocks(emp::NetIO&, const BlockCorrelatedOT::Receiver&, boost::span<const emp::block> blocksToAuth);
 
         size_t global_key_size() const {
             return _globalKeySize;
@@ -67,6 +87,30 @@ namespace ATLab {
             return std::move(_macs);
         }
 
+        /**
+         * [[x]]_y => [[y]_x
+         *
+         * The authed block becomes the global key. The MAC becomes the local key.
+         *
+         * Only specifies one authed block with one global key, so the output is also of size 1x1
+         */
+        [[nodiscard]]
+        ITMacBlockKeys swap_value_and_key(size_t globalKeyPos, size_t blockPos) const noexcept;
+
+        /**
+         * [[x]]_vec{y} => [[vec{y}]_x
+         *
+         * The authed block becomes the global key. The MACs becomes the local keys.
+         */
+        [[nodiscard]]
+        ITMacBlockKeys swap_value_and_key() && noexcept;
+
+        /**
+         * [[x]]_y with MAC m => [[m]]_y^-1 with MAC x
+         * By just swaping the blocks and the MACs
+         */
+        void inverse_value_and_mac() noexcept;
+
         friend ITMacBlocks operator*(const Matrix<bool>&, const ITMacBlocks&);
     };
 
@@ -78,7 +122,7 @@ namespace ATLab {
     public:
         ITMacScaledBits(
             emp::NetIO&,
-            BlockCorrelatedOT::Receiver&,
+            const BlockCorrelatedOT::Receiver&,
             const emp::block& scalarBlock,
             const Bitset& blockSelectors
         );
@@ -109,9 +153,10 @@ namespace ATLab {
     };
 
     class ITMacBlockKeys {
+        friend class ITMacBlockKeySpan;
+
         std::vector<emp::block> _localKeys; // flattened by global key then block index
         std::vector<emp::block> _globalKeys;
-
     public:
         // Move localkeys only when globalKey with size 1
         ITMacBlockKeys(std::vector<emp::block>&& localKeys, const emp::block globalKey):
@@ -150,7 +195,7 @@ namespace ATLab {
         ITMacBlockKeys(const BlockCorrelatedOT::Sender& bCOTSender, size_t blockSize);
 
         // `Fix` for blocks
-        ITMacBlockKeys(emp::NetIO&, BlockCorrelatedOT::Sender&, size_t blockSize);
+        ITMacBlockKeys(emp::NetIO&, const BlockCorrelatedOT::Sender&, size_t blockSize);
 
         size_t global_key_size() const {
             return _globalKeys.size();
@@ -178,6 +223,33 @@ namespace ATLab {
                     _mm_xor_si128(_localKeys.at(i * blockSize + blockPos), _globalKeys.at(i));
             }
         }
+
+        /**
+         * [[x]]_y => [[y]_x
+         *
+         * The global key becomes the authed block. The local key becomes the MAC.
+         *
+         * Input/Output of size 1x1
+         */
+        [[nodiscard]]
+        ITMacBlocks swap_value_and_key(size_t globalKeyPos, size_t blockPos) const noexcept;
+
+        /**
+         * [[x]]_vec{y} => [[vec{y}]_x
+         *
+         * The global keys become the authed blocks. The local keys become the MACs.
+         *
+         * Only support ITMacBlockKeys with only one block.
+         */
+        [[nodiscard]]
+        ITMacBlocks swap_value_and_key() && noexcept;
+
+        /**
+         * [[x]]_y with MAC m => [[m]]_y^-1 with MAC x
+         *
+         * By setting global keys to their inverse, and local key *= inv(global key)
+         */
+        void inverse_value_and_mac() noexcept;
 
         friend ITMacBlockKeys operator*(const Matrix<bool>&, const ITMacBlockKeys&);
     };
@@ -227,7 +299,7 @@ namespace ATLab {
          * Fixed ITMacBit constructor, the `Fix` procedure defined in CYYW23.
          * Will invoke the random constructor first, and send to
          */
-        ITMacBits(emp::NetIO& io, BlockCorrelatedOT::Receiver& bCOTReceiver, Bitset bitsToFix):
+        ITMacBits(emp::NetIO& io, const BlockCorrelatedOT::Receiver& bCOTReceiver, Bitset bitsToFix):
             ITMacBits{bCOTReceiver, bitsToFix.size()}
         {
 
@@ -364,7 +436,7 @@ namespace ATLab {
          * Fixed ITMacKey constructor, the `Fix` procedure defined in CYYW23.
          * @param bitsSize size of bits to be fixed
          */
-        ITMacBitKeys(emp::NetIO& io, BlockCorrelatedOT::Sender& bCOTSender, const size_t bitsSize):
+        ITMacBitKeys(emp::NetIO& io, const BlockCorrelatedOT::Sender& bCOTSender, const size_t bitsSize):
             ITMacBitKeys{bCOTSender, bitsSize}
         {
             auto* diffArr {new bool[bitsSize]};
@@ -471,6 +543,137 @@ namespace ATLab {
 
         friend ITMacBitKeys operator*(const Matrix<bool>&, const ITMacBitKeys&);
     };
+
+    [[nodiscard]]
+    bool check_same_bit(emp::NetIO& io, const ITMacBlockKeySpan& key0, const ITMacBlockKeySpan& key1) noexcept;
+
+    [[nodiscard]]
+    bool check_same_bit(emp::NetIO& io, const ITMacBlockSpan& block0, const ITMacBlockSpan& block1) noexcept;
+
+    // A span with only one globalKey
+    class ITMacBlockSpan {
+        const ITMacBlocks& _authedBlocks;
+        const size_t _globalKeyPos;
+        const size_t _begin;
+        const size_t _end;
+
+        constexpr static size_t MAX_SIZE_ {std::numeric_limits<size_t>::max()};
+    public:
+        // Empty span when begin == end
+        ITMacBlockSpan(
+            const ITMacBlocks& authedBlocks,
+            const size_t globalKeyPos,
+            const size_t begin,
+            const size_t end
+        ):
+            _authedBlocks {authedBlocks},
+            _globalKeyPos {globalKeyPos},
+            _begin {begin},
+            _end {end}
+        {
+            assert(authedBlocks.size() != 0);
+            assert(globalKeyPos < authedBlocks.global_key_size());
+            assert(begin <= end);
+            assert(end <= authedBlocks.size());
+        }
+
+        ITMacBlockSpan(const ITMacBlocks& block): ITMacBlockSpan {block, 0, 0, block.size()} {}
+
+        [[nodiscard]]
+        size_t size() const noexcept {
+            return _end - _begin;
+        }
+
+        [[nodiscard]]
+        const auto& get_block(const size_t i) const noexcept {
+            assert(_begin + i < _end);
+            assert(i <= MAX_SIZE_ - _begin);
+
+            return _authedBlocks.get_block(_begin + i);
+        }
+
+        [[nodiscard]]
+        const auto& get_mac(const size_t i) const noexcept {
+            assert(_begin + i < _end);
+            assert(i <= MAX_SIZE_ - _begin);
+
+            return _authedBlocks.get_mac(_globalKeyPos, _begin + i);
+        }
+
+        [[nodiscard]]
+        boost::span<const ITMacBlocks::MacType> mac_span() const noexcept {
+            return {_authedBlocks._macs.data() + _authedBlocks.size() * _globalKeyPos + _begin, _end - _begin};
+        }
+    };
+
+    class ITMacBlockKeySpan {
+        const ITMacBlockKeys& _authedBlockKeys;
+        const size_t _globalKeyPos;
+        const size_t _begin;
+        const size_t _end;
+
+        constexpr static size_t MAX_SIZE_ {std::numeric_limits<size_t>::max()};
+    public:
+        ITMacBlockKeySpan(
+            const ITMacBlockKeys& authedBlockKeys,
+            const size_t globalKeyPos,
+            const size_t begin,
+            const size_t end
+        ):
+            _authedBlockKeys {authedBlockKeys},
+            _globalKeyPos {globalKeyPos},
+            _begin {begin},
+            _end {end}
+        {
+            assert(authedBlockKeys.size() != 0);
+            assert(globalKeyPos < authedBlockKeys.global_key_size());
+            assert(begin <= end);
+            assert(end <= authedBlockKeys.size());
+        }
+
+        ITMacBlockKeySpan(const ITMacBlockKeys& key): ITMacBlockKeySpan{key, 0, 0, key.size()} {}
+
+        [[nodiscard]]
+        size_t size() const noexcept {
+            return _end - _begin;
+        }
+
+        [[nodiscard]]
+        const auto& get_local_key(const size_t i) const noexcept {
+            assert(_begin + i < _end);
+            assert(i <= MAX_SIZE_ - _begin);
+
+            return _authedBlockKeys.get_local_key(_globalKeyPos, _begin + i);
+        }
+
+        [[nodiscard]]
+        const auto& global_key() const noexcept {
+            return _authedBlockKeys.get_global_key(_globalKeyPos);
+        }
+
+        [[nodiscard]]
+        boost::span<const emp::block> local_key_span() const noexcept {
+            return {
+                _authedBlockKeys._localKeys.data() + _authedBlockKeys.size() * _globalKeyPos + _begin,
+                _end - _begin
+            };
+        }
+    };
+
+    // Prove the authed blocks by different global keys are the same
+    void eqcheck_diff_key(
+        emp::NetIO& io,
+        const ITMacBlockSpan& authedBlocks0,
+        const ITMacBlockSpan& authedBlocks1
+    ) noexcept;
+
+    // Check the authed blocks by different global keys are the same.
+    // Throw if check fails
+    void eqcheck_diff_key(
+        emp::NetIO& io,
+        const ITMacBlockKeySpan& authedBlocks0,
+        const ITMacBlockKeySpan& authedBlocks1
+    );
 }
 
 #endif // ATLab_AUTHED_BIT_HPP
