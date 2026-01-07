@@ -100,7 +100,7 @@ if (ENABLE_TEST)
         tests/authed_bit.test.cpp
         tests/DVZK.test.cpp
         tests/global_key_sampling.test.cpp
-        tests/vector_inner_product_benchmark.test.cpp
+        tests/galois-field-arithmetics.test.cpp
         tests/circuit.test.cpp
         tests/preprocessor.test.cpp
         tests/full-execution.test.cpp
