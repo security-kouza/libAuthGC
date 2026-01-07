@@ -97,16 +97,6 @@ namespace ATLab::GlobalKeySampling {
 
             // f, g
             const emp::block toCompare {_mm_xor_si128(deltaBKey.get_local_key(0, 0), authedDeltaA.get_mac(0, 0))};
-            // std::array<uint8_t, DIGEST_SIZE> hashRes {};
-            // emp::Hash::hash_once(hashRes.data(), &toCompare, sizeof(toCompare));
-            // std::array<uint8_t, HALF_DIGEST_SIZE> lowHash {};
-            // io.send_data(hashRes.data(), HALF_DIGEST_SIZE);
-            // io.recv_data(lowHash.data(), HALF_DIGEST_SIZE);
-            //
-            // const auto expectedLow {
-            //     *reinterpret_cast<const std::array<uint8_t, HALF_DIGEST_SIZE>*>(hashRes.data() + HALF_DIGEST_SIZE)
-            // };
-            // if (expectedLow != lowHash) {
             if (compare_hash_low(io, &toCompare, sizeof(toCompare))) {
                 throw std::runtime_error{"ΔB not consistent"};
             }
