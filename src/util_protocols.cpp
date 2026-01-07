@@ -1,5 +1,8 @@
 #include "ATLab/util_protocols.hpp"
 
+#include "params.hpp"
+#include "PRNG.hpp"
+#include "emp-tool/utils/crh.h"
 #include "emp-tool/utils/hash.h"
 
 namespace ATLab {
@@ -33,5 +36,26 @@ namespace ATLab {
         io.recv_data(&receivedLow, sizeof(receivedLow));
 
         return low == receivedLow;
+    }
+
+    emp::block toss_random_block(emp::NetIO& io) {
+        emp::block block;
+        THE_GLOBAL_PRNG.random_block(&block, 1);
+
+        emp::CRH crh;
+        const emp::block cm {crh.H(block)};
+        io.send_data(&cm, sizeof(cm));
+
+        emp::block blk_, cm_;
+        io.recv_data(&cm_, sizeof(cm_));
+        io.send_data(&block, sizeof(block));
+        io.recv_data(&blk_, sizeof(blk_));
+
+        if (as_uint128(cm_) != as_uint128(crh.H(blk_))) {
+            throw std::runtime_error{ERR_MALICIOUS};
+        }
+        xor_to(block, blk_);
+
+        return block;
     }
 }
