@@ -34,14 +34,12 @@ add_subdirectory(libs/Kyber)
 # Target
 set(LIB
     emp-tool
-    emp-ot
     emp-ot-original
     Kyber
     Boost::asio
     Boost::dynamic_bitset
 )
 set(SRC
-    src/socket.cpp
     src/PRNG.cpp
     src/utils.cpp
     src/EndemicOT/Endemic_OT_C.c
@@ -57,7 +55,6 @@ set(SRC
     src/util_protocols.cpp
 )
 set(HEADER
-    include/socket.hpp
     include/PRNG.hpp
     include/utils.hpp
     include/EndemicOT/Endemic_OT_C.h
@@ -93,7 +90,6 @@ if (ENABLE_TEST)
         tests/io.test.cpp
         tests/EndemicOT.test.cpp
         tests/PRNG.test.cpp
-        tests/IKNP.test.cpp
         tests/bCOT.test.cpp
         tests/authed_bit.test.cpp
         tests/DVZK.test.cpp

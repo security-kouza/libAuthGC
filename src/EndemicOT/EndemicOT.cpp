@@ -81,25 +81,6 @@ namespace ATLab::EndemicOT {
         return ctxt;
     }
 
-    void batch_send(
-        ATLab::Socket& socket,
-        const __m128i* const data0,
-        const __m128i* const data1,
-        const size_t length
-    ) {
-        Sender::Data d0, d1;
-        for (size_t i{0}; i != length; ++i) {
-            // resetting the last 128 bits is not necessary since `recv` does not use those uninitialized bits
-            memcpy(&d0, &data0[i], sizeof(__m128i));
-            memcpy(&d1, &data1[i], sizeof(__m128i));
-            Sender sender(d0, d1);
-            ReceiverMsg rMsg;
-            socket.read(&rMsg, sizeof(rMsg), "EOT sender: reading receiver's message.");
-            auto sMsg{sender.encrypt_with(rMsg)};
-            socket.write(&sMsg, sizeof(sMsg), "EOT sender: sending encrypted data.");
-        }
-    }
-
     void batch_send(emp::NetIO& io, const emp::block* data0, const emp::block* data1, const size_t length) {
         Sender::Data d0, d1;
         for (size_t i{0}; i != length; ++i) {
@@ -114,23 +95,6 @@ namespace ATLab::EndemicOT {
         }
     }
 
-
-    void batch_receive(
-        ATLab::Socket& socket,
-        __m128i* const data,
-        const bool* const choices,
-        const size_t length
-    ) {
-        for (size_t i{0}; i != length; ++i) {
-            Receiver receiver(choices[i]);
-            auto rMsg{receiver.get_receiver_msg()};
-            socket.write(&rMsg, sizeof(rMsg), "EOT receiver: sending receiver's message.");
-            SenderMsg sMsg;
-            socket.read(&sMsg, sizeof(sMsg), "EOT receiver: receiving sender message to decrypt");
-            auto decryptedData{receiver.decrypt_chosen(sMsg)};
-            memcpy(&data[i], &decryptedData, sizeof(__m128i));
-        }
-    }
 
     void batch_receive(emp::NetIO& io, emp::block* data, const bool* const choices, const size_t length) {
         for (size_t i{0}; i != length; ++i) {

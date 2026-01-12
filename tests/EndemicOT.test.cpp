@@ -27,6 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <chrono>
 #include <iostream>
 #include <limits>
+#include <thread>
 
 #include <gtest/gtest.h>
 
@@ -113,7 +114,8 @@ TEST(EndemicOT, UnitTest) {
 const std::string IP {"127.0.0.1"};
 constexpr int PORT {12345}; // TODO: check if port occupied
 
-TEST(EndemicOT, BatchTest) {
+TEST(EndemicOT, emp_BatchTest) {
+
     constexpr size_t NUM_OT {128};
     std::array<__m128i, NUM_OT> data0 {}, data1 {}, data {};
     std::array<bool, NUM_OT> choices {};
@@ -124,75 +126,6 @@ TEST(EndemicOT, BatchTest) {
 
     std::thread sender {
         [&data0, &data1, &durationSender]() {
-            ATLab::Socket socket(IP, PORT);
-            socket.connect();
-
-            std::byte syncByte {0};
-            socket.write(&syncByte, 1);
-
-            const auto start {std::chrono::high_resolution_clock::now()};
-            for (size_t i = 0; i != REPEAT_CNT; ++i) {
-                write_random_data(data0);
-                write_random_data(data1);
-                ATLab::EndemicOT::batch_send(socket, data0.data(), data1.data(), data0.size());
-            }
-            const auto end {std::chrono::high_resolution_clock::now()};
-            durationSender = end - start;
-        }
-    }, receiver {
-        [&data, &choices, &durationReceiver]() {
-            ATLab::Socket socket(IP, PORT);
-            socket.accept();
-
-            std::byte syncByte {0};
-            socket.read(&syncByte, 1);
-
-            const auto start {std::chrono::high_resolution_clock::now()};
-            for (size_t i = 0; i != REPEAT_CNT; ++i) {
-                choices = ATLab::random_bool_array<NUM_OT>();
-                ATLab::EndemicOT::batch_receive(socket, data.data(), choices.data(), data.size());
-            }
-            const auto end {std::chrono::high_resolution_clock::now()};
-            durationReceiver = end - start;
-        }
-    };
-
-    sender.join();
-    receiver.join();
-
-    durationSender /= REPEAT_CNT;
-    durationReceiver /= REPEAT_CNT;
-
-    std::cout << "Sender  : " << std::setprecision(4) << durationSender.count() << "s for " << NUM_OT << " OTs "
-        "(" << std::setprecision(3) << durationSender.count() / NUM_OT * 1000000 << "μs per OT)\n";
-
-    std::cout << "Receiver: " << std::setprecision(4) << durationReceiver.count() << "s for " << NUM_OT << " OTs "
-        "(" << std::setprecision(3) << durationReceiver.count() / NUM_OT * 1000000 << "μs per OT)\n";
-
-    auto& d0 = *reinterpret_cast<const std::array<__uint128_t, 128>*>(&data0);
-    auto& d1 = *reinterpret_cast<const std::array<__uint128_t, 128>*>(&data1);
-    auto& d = *reinterpret_cast<const std::array<__uint128_t, 128>*>(&data);
-
-    // REPEAT_CNT only to calculate the average time
-    // Thus here only checking the correctness of one (which is the last) batched OT
-    for (size_t i {0}; i != 128; ++i) {
-        EXPECT_EQ(d.at(i), choices.at(i) ? d1.at(i) : d0.at(i));
-    }
-}
-
-TEST(EndemicOT, emp_BatchTest) {
-    constexpr size_t NUM_OT {128};
-    std::array<__m128i, NUM_OT> data0 {}, data1 {}, data {};
-    std::array<bool, NUM_OT> choices {};
-
-    std::array<std::byte, 32> receiverChallenge {}, senderChallenge {};
-
-    std::chrono::duration<double> durationSender {0}, durationReceiver {0};
-
-    constexpr size_t REPEAT_CNT {1000};
-
-    std::thread sender {
-        [&data0, &data1, &durationSender, &senderChallenge]() {
             emp::NetIO io(emp::NetIO::CLIENT, IP, PORT, true);
 
             const auto start {std::chrono::high_resolution_clock::now()};
@@ -206,7 +139,7 @@ TEST(EndemicOT, emp_BatchTest) {
 
         }
     }, receiver {
-        [&data, &choices, &durationReceiver, &receiverChallenge]() {
+        [&data, &choices, &durationReceiver]() {
             emp::NetIO io(emp::NetIO::SERVER, IP, PORT, true);
 
             const auto start {std::chrono::high_resolution_clock::now()};
@@ -241,6 +174,4 @@ TEST(EndemicOT, emp_BatchTest) {
     for (size_t i {0}; i != 128; ++i) {
         EXPECT_EQ(d.at(i), choices.at(i) ? d1.at(i) : d0.at(i));
     }
-
-    EXPECT_EQ(receiverChallenge, senderChallenge);
 }
