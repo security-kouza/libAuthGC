@@ -29,7 +29,6 @@ FetchContent_MakeAvailable(Boost)
 add_subdirectory(libs/emp-tool)
 add_subdirectory(libs/emp-ot)
 add_subdirectory(libs/Kyber)
-add_subdirectory(libs/emp-ag2pc)
 
 
 # Target
@@ -37,7 +36,6 @@ set(LIB
     emp-tool
     emp-ot
     emp-ot-original
-    emp-ag2pc
     Kyber
     Boost::asio
     Boost::dynamic_bitset
