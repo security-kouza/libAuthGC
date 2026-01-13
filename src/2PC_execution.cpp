@@ -4,7 +4,7 @@
 namespace ATLab {
     namespace Garbler {
         void online(
-            emp::NetIO& io,
+            ATLab::NetIO& io,
             const Circuit& circuit,
             const GarbledCircuit& gc,
             const PreprocessedData& wireMasks,
@@ -63,7 +63,7 @@ namespace ATLab {
 
     namespace Evaluator {
         Bitset online(
-            emp::NetIO& io,
+            ATLab::NetIO& io,
             const Circuit& circuit,
             const ReceivedGarbledCircuit& gc,
             const PreprocessedData& wireMasks,

@@ -3,7 +3,7 @@
 namespace ATLab {
     namespace Garbler {
         GarbledCircuit garble(
-            emp::NetIO& io,
+            ATLab::NetIO& io,
             const Circuit& circuit,
             const PreprocessedData& wireMasks,
             std::vector<emp::block> label0
@@ -93,7 +93,7 @@ namespace ATLab {
     }
 
     namespace Evaluator {
-        ReceivedGarbledCircuit garble(emp::NetIO& io, const Circuit& circuit) {
+        ReceivedGarbledCircuit garble(ATLab::NetIO& io, const Circuit& circuit) {
             GarbledTableVec garbledTables(circuit.andGateSize, {zero_block(), zero_block()});
 
             io.recv_data(garbledTables.data(), circuit.andGateSize * 2 * sizeof(emp::block));

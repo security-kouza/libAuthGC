@@ -12,13 +12,13 @@ constexpr unsigned short PORT {12341};
 using ATLab::ITMacBitKeys;
 using ATLab::ITMacBits;
 
-static emp::NetIO& server_io() {
-    static emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
+static ATLab::NetIO& server_io() {
+    static ATLab::NetIO io(ATLab::NetIO::SERVER, ADDRESS, PORT, true);
     return io;
 }
 
-static emp::NetIO& client_io() {
-    static emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
+static ATLab::NetIO& client_io() {
+    static ATLab::NetIO io(ATLab::NetIO::CLIENT, ADDRESS, PORT, true);
     return io;
 }
 

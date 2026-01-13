@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <emp-tool/utils/block.h>
 #include <emp-tool/utils/f2k.h>
 
-#include "emp-tool/io/net_io_channel.h"
+#include "ATLab/net-io.hpp"
 
 namespace ATLab {
 
@@ -95,7 +95,7 @@ namespace ATLab {
      * @param endPos 0 meaning until the end. Requiring endPos > beginPos
      */
     inline void send_boost_bitset(
-        emp::NetIO& io,
+        NetIO& io,
         const Bitset& bitset,
         const size_t beginPos = 0,
         const size_t endPos = 0
@@ -116,7 +116,7 @@ namespace ATLab {
     }
 
     [[nodiscard]]
-    inline Bitset receive_boost_bitset(emp::NetIO& io, const size_t bitSize) {
+    inline Bitset receive_boost_bitset(NetIO& io, const size_t bitSize) {
         std::vector<BitsetBlock> blocks(calc_bitset_block(bitSize));
         io.recv_data(blocks.data(), blocks.size() * sizeof(BitsetBlock));
         Bitset res {blocks.cbegin(), blocks.cend()};

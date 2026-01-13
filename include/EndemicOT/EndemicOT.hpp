@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <array>
 #include <emmintrin.h>
 
-#include <emp-tool/io/net_io_channel.h>
+#include "ATLab/net-io.hpp"
 
 namespace ATLab::EndemicOT {
 
@@ -80,7 +80,7 @@ extern "C" {
     };
 
     void batch_send(
-        emp::NetIO&         io,
+        ATLab::NetIO&         io,
         const emp::block*   data0,
         const emp::block*   data1,
         size_t              length
@@ -88,7 +88,7 @@ extern "C" {
 
     // Stack allocation. Preferred.
     template <size_t LEN>
-    void batch_send(emp::NetIO& io, const emp::block* data0, const emp::block* data1) {
+    void batch_send(ATLab::NetIO& io, const emp::block* data0, const emp::block* data1) {
         // resetting the last 128 bits is not necessary since `recv` does not use those uninitialized bits
         std::vector<Sender> senders;
         senders.reserve(LEN);
@@ -113,7 +113,7 @@ extern "C" {
 
 
     void batch_receive(
-        emp::NetIO&     io,
+        ATLab::NetIO&     io,
         emp::block*     data,
         const bool*     choices,
         size_t          length
@@ -121,7 +121,7 @@ extern "C" {
 
     // Stack allocation. Preferred.
     template <size_t LEN>
-    void batch_receive(emp::NetIO& io, emp::block* data, const bool* const choices) {
+    void batch_receive(ATLab::NetIO& io, emp::block* data, const bool* const choices) {
         std::vector<Receiver> receivers;
         receivers.reserve(LEN);
         for (size_t i{0}; i != LEN; ++i) {

@@ -3,7 +3,7 @@
 
 #include <boost/program_options.hpp>
 
-#include <emp-tool/io/net_io_channel.h>
+#include "ATLab/net-io.hpp"
 
 #include <circuit_parser.hpp>
 #include <ATLab/preprocess.hpp>
@@ -45,11 +45,11 @@ namespace {
         };
     }
 
-    void rtt_test(emp::NetIO& io) {
+    void rtt_test(ATLab::NetIO& io) {
         constexpr int N = 1000;
         const auto start = std::chrono::high_resolution_clock::now();
         for(int i = 0; i < N; ++i) {
-            if(io.role == emp::NetIO::SERVER) {
+            if(io.role == ATLab::NetIO::SERVER) {
                 io.send_data("x", 1);
                 char buf[1];
                 io.recv_data(buf, 1);
@@ -66,7 +66,7 @@ namespace {
 }
 
 void garbler(const Circuit& circuit, const std::string& host, const unsigned short port, const size_t iteration) {
-    emp::NetIO io {emp::NetIO::SERVER, host, port, false};
+    ATLab::NetIO io {ATLab::NetIO::SERVER, host, port, false};
     rtt_test(io);
 
     const auto zeroMasks {gen_pre_data_zero<Garbler::PreprocessedData>(circuit)};
@@ -87,7 +87,7 @@ BENCHMARK_END_ITERATION(garbler online, iteration)
 }
 
 void evaluator(const Circuit& circuit, const std::string& host, const unsigned short port, const size_t iteration) {
-    emp::NetIO io {emp::NetIO::CLIENT, host, port, false};
+    ATLab::NetIO io {ATLab::NetIO::CLIENT, host, port, false};
     rtt_test(io);
 
     const auto zeroMasks {gen_pre_data_zero<Evaluator::PreprocessedData>(circuit)};
@@ -166,7 +166,7 @@ int main(int argc, char* argv[]) {
         }
     } else if (phase == "pre") {
         if (role == "garbler") {
-            emp::NetIO io {emp::NetIO::SERVER, host, port, false};
+            ATLab::NetIO io {ATLab::NetIO::SERVER, host, port, false};
             BENCHMARK_INIT;
             BENCHMARK_START;
             for (size_t i {0}; i != iteration; ++i) {
@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
             }
             BENCHMARK_END_ITERATION(garber pre, iteration);
         } else {
-            emp::NetIO io {emp::NetIO::CLIENT, host, port, false};
+            ATLab::NetIO io {ATLab::NetIO::CLIENT, host, port, false};
             BENCHMARK_INIT;
             BENCHMARK_START;
             for (size_t i {0}; i != iteration; ++i) {

@@ -53,10 +53,10 @@ namespace ATLab {
         ITMacBlocks(const BlockCorrelatedOT::Receiver& bCOTReceiver, size_t blockSize);
 
         // `Fix` for blocks
-        ITMacBlocks(emp::NetIO&, const BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
+        ITMacBlocks(ATLab::NetIO&, const BlockCorrelatedOT::Receiver&, std::vector<emp::block> blocksToAuth);
 
         // `Fix` for blocks
-        ITMacBlocks(emp::NetIO&, const BlockCorrelatedOT::Receiver&, boost::span<const emp::block> blocksToAuth);
+        ITMacBlocks(ATLab::NetIO&, const BlockCorrelatedOT::Receiver&, boost::span<const emp::block> blocksToAuth);
 
         size_t global_key_size() const {
             return _globalKeySize;
@@ -121,7 +121,7 @@ namespace ATLab {
 
     public:
         ITMacScaledBits(
-            emp::NetIO&,
+            ATLab::NetIO&,
             const BlockCorrelatedOT::Receiver&,
             const emp::block& scalarBlock,
             const Bitset& blockSelectors
@@ -195,7 +195,7 @@ namespace ATLab {
         ITMacBlockKeys(const BlockCorrelatedOT::Sender& bCOTSender, size_t blockSize);
 
         // `Fix` for blocks
-        ITMacBlockKeys(emp::NetIO&, const BlockCorrelatedOT::Sender&, size_t blockSize);
+        ITMacBlockKeys(ATLab::NetIO&, const BlockCorrelatedOT::Sender&, size_t blockSize);
 
         size_t global_key_size() const {
             return _globalKeys.size();
@@ -299,7 +299,7 @@ namespace ATLab {
          * Fixed ITMacBit constructor, the `Fix` procedure defined in CYYW23.
          * Will invoke the random constructor first, and send to
          */
-        ITMacBits(emp::NetIO& io, const BlockCorrelatedOT::Receiver& bCOTReceiver, Bitset bitsToFix):
+        ITMacBits(ATLab::NetIO& io, const BlockCorrelatedOT::Receiver& bCOTReceiver, Bitset bitsToFix):
             ITMacBits{bCOTReceiver, bitsToFix.size()}
         {
 
@@ -346,7 +346,7 @@ namespace ATLab {
          * Send first the bits, then the hash of all the MACs authed with key[0]
          */
         template <typename HashF>
-        void open(emp::NetIO& io, HashF&& h, const size_t begin = 0, const size_t end = 0) const noexcept {
+        void open(ATLab::NetIO& io, HashF&& h, const size_t begin = 0, const size_t end = 0) const noexcept {
             assert(
                 (end == 0 && begin == 0) ||
                 (end != 0 && (
@@ -436,7 +436,7 @@ namespace ATLab {
          * Fixed ITMacKey constructor, the `Fix` procedure defined in CYYW23.
          * @param bitsSize size of bits to be fixed
          */
-        ITMacBitKeys(emp::NetIO& io, const BlockCorrelatedOT::Sender& bCOTSender, const size_t bitsSize):
+        ITMacBitKeys(ATLab::NetIO& io, const BlockCorrelatedOT::Sender& bCOTSender, const size_t bitsSize):
             ITMacBitKeys{bCOTSender, bitsSize}
         {
             auto* diffArr {new bool[bitsSize]};
@@ -483,7 +483,7 @@ namespace ATLab {
          */
         template <typename HashF>
         [[nodiscard]]
-        ITMacOpenedBits open(emp::NetIO& io, HashF&& h, const size_t begin = 0, size_t end = 0) const {
+        ITMacOpenedBits open(ATLab::NetIO& io, HashF&& h, const size_t begin = 0, size_t end = 0) const {
             assert(
                 (end == 0 && begin == 0) ||
                 (end != 0 && (
@@ -545,10 +545,10 @@ namespace ATLab {
     };
 
     [[nodiscard]]
-    bool check_same_bit(emp::NetIO& io, const ITMacBlockKeySpan& key0, const ITMacBlockKeySpan& key1) noexcept;
+    bool check_same_bit(ATLab::NetIO& io, const ITMacBlockKeySpan& key0, const ITMacBlockKeySpan& key1) noexcept;
 
     [[nodiscard]]
-    bool check_same_bit(emp::NetIO& io, const ITMacBlockSpan& block0, const ITMacBlockSpan& block1) noexcept;
+    bool check_same_bit(ATLab::NetIO& io, const ITMacBlockSpan& block0, const ITMacBlockSpan& block1) noexcept;
 
     // A span with only one globalKey
     class ITMacBlockSpan {
@@ -662,7 +662,7 @@ namespace ATLab {
 
     // Prove the authed blocks by different global keys are the same
     void eqcheck_diff_key(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const ITMacBlockSpan& authedBlocks0,
         const ITMacBlockSpan& authedBlocks1
     ) noexcept;
@@ -670,7 +670,7 @@ namespace ATLab {
     // Check the authed blocks by different global keys are the same.
     // Throw if check fails
     void eqcheck_diff_key(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const ITMacBlockKeySpan& authedBlocks0,
         const ITMacBlockKeySpan& authedBlocks1
     );

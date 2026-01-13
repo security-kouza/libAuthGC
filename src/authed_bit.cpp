@@ -142,7 +142,7 @@ namespace ATLab {
     {}
 
     ITMacBlocks::ITMacBlocks(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Receiver& bCOTReceiver,
         std::vector<emp::block> blocksToAuth
     ):
@@ -170,7 +170,7 @@ namespace ATLab {
     {}
 
     ITMacBlocks::ITMacBlocks(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Receiver& bCOTReceiver,
         boost::span<const emp::block> blocksToAuth
     ):
@@ -203,7 +203,7 @@ namespace ATLab {
     }
 
     ITMacScaledBits::ITMacScaledBits(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const emp::block& scalarBlock,
         const Bitset& blockSelectors
@@ -253,7 +253,7 @@ namespace ATLab {
 
     // Constructor for a fixed block
     ITMacBlockKeys::ITMacBlockKeys(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Sender& bCOTSender,
         size_t blockSize
     ):
@@ -287,14 +287,14 @@ namespace ATLab {
         }
     }
 
-    bool check_same_bit(emp::NetIO& io, const ITMacBlockKeySpan& key0, const ITMacBlockKeySpan& key1) noexcept {
+    bool check_same_bit(ATLab::NetIO& io, const ITMacBlockKeySpan& key0, const ITMacBlockKeySpan& key1) noexcept {
         assert(key0.size() == 1);
         assert(key1.size() == 1);
         const emp::block toCompare {_mm_xor_si128(key0.get_local_key(0), key1.get_local_key(0))};
         return compare_hash_high(io, &toCompare, sizeof(toCompare));
     }
 
-    bool check_same_bit(emp::NetIO& io, const ITMacBlockSpan& block0, const ITMacBlockSpan& block1) noexcept {
+    bool check_same_bit(ATLab::NetIO& io, const ITMacBlockSpan& block0, const ITMacBlockSpan& block1) noexcept {
         assert(block0.size() == 1);
         assert(block1.size() == 1);
         const emp::block toCompare {_mm_xor_si128(block0.get_mac(0), block1.get_mac(0))};
@@ -302,7 +302,7 @@ namespace ATLab {
     }
 
     void eqcheck_diff_key(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const ITMacBlockSpan& authedBlocks0,
         const ITMacBlockSpan& authedBlocks1
     ) noexcept {
@@ -325,7 +325,7 @@ namespace ATLab {
     }
 
     void eqcheck_diff_key(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const ITMacBlockKeySpan& authedBlocks0,
         const ITMacBlockKeySpan& authedBlocks1
     ) {

@@ -81,7 +81,7 @@ namespace ATLab::EndemicOT {
         return ctxt;
     }
 
-    void batch_send(emp::NetIO& io, const emp::block* data0, const emp::block* data1, const size_t length) {
+    void batch_send(ATLab::NetIO& io, const emp::block* data0, const emp::block* data1, const size_t length) {
         Sender::Data d0, d1;
         for (size_t i{0}; i != length; ++i) {
             // resetting the last 128 bits is not necessary since `recv` does not use those uninitialized bits
@@ -96,7 +96,7 @@ namespace ATLab::EndemicOT {
     }
 
 
-    void batch_receive(emp::NetIO& io, emp::block* data, const bool* const choices, const size_t length) {
+    void batch_receive(ATLab::NetIO& io, emp::block* data, const bool* const choices, const size_t length) {
         for (size_t i{0}; i != length; ++i) {
             Receiver receiver(choices[i]);
             auto rMsg{receiver.get_receiver_msg()};

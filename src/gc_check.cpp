@@ -44,7 +44,7 @@ namespace ATLab {
 
     namespace Garbler {
         void check(
-            emp::NetIO& io,
+            ATLab::NetIO& io,
             const Circuit& circuit,
             const PreprocessedData& wireMasks,
             const GarbledCircuit& gc
@@ -67,7 +67,7 @@ namespace ATLab {
                 &coeff,
                 &gc,
                 &accumulator
-            ](emp::NetIO& ioRef, const Wire w) {
+            ](ATLab::NetIO& ioRef, const Wire w) {
                 const auto& gcCheckData {circuit.gc_check_data(w)};
                 emp::block ak1 {zero_block()};
                 for (const auto& [gateIndex, connected] : gcCheckData) {
@@ -139,7 +139,7 @@ namespace ATLab {
 
     namespace Evaluator {
         void check(
-            emp::NetIO& io,
+            ATLab::NetIO& io,
             const Circuit& circuit,
             const PreprocessedData& wireMasks,
             const std::vector<emp::block>& labels,
@@ -159,7 +159,7 @@ namespace ATLab {
             }
 
             emp::block accumulator {zero_block()};
-            auto independent_wire_routine = [&accumulator, &labels, &maskedValues](emp::NetIO& ioRef, const Wire w) {
+            auto independent_wire_routine = [&accumulator, &labels, &maskedValues](ATLab::NetIO& ioRef, const Wire w) {
                 xor_to(accumulator, hash(labels[w], w, 2));
                 emp::block received {zero_block()};
                 ioRef.recv_data(&received, sizeof(received));

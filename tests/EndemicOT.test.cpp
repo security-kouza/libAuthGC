@@ -126,7 +126,7 @@ TEST(EndemicOT, emp_BatchTest) {
 
     std::thread sender {
         [&data0, &data1, &durationSender]() {
-            emp::NetIO io(emp::NetIO::CLIENT, IP, PORT, true);
+            ATLab::NetIO io(ATLab::NetIO::CLIENT, IP, PORT, true);
 
             const auto start {std::chrono::high_resolution_clock::now()};
             for (size_t i = 0; i != REPEAT_CNT; ++i) {
@@ -140,7 +140,7 @@ TEST(EndemicOT, emp_BatchTest) {
         }
     }, receiver {
         [&data, &choices, &durationReceiver]() {
-            emp::NetIO io(emp::NetIO::SERVER, IP, PORT, true);
+            ATLab::NetIO io(ATLab::NetIO::SERVER, IP, PORT, true);
 
             const auto start {std::chrono::high_resolution_clock::now()};
             for (size_t i = 0; i != REPEAT_CNT; ++i) {

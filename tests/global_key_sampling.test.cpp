@@ -16,14 +16,14 @@ TEST(Global_Key_Sampling, DEFAULT) {
     emp::block deltaA, deltaB, alpha0, beta0;
 
     std::thread garblerThread{[&](){
-        emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
+        ATLab::NetIO io(ATLab::NetIO::SERVER, ADDRESS, PORT, true);
         EXPECT_NO_THROW(
             ATLab::GlobalKeySampling::Garbler garlber(io);
             deltaA = garlber.get_delta();
             alpha0 = garlber.get_alpha_0();
         );
     }}, evaluatorThread{[&]() {
-        emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
+        ATLab::NetIO io(ATLab::NetIO::CLIENT, ADDRESS, PORT, true);
         EXPECT_NO_THROW(
             ATLab::GlobalKeySampling::Evaluator evaluator(io);
             deltaB = evaluator.get_delta();

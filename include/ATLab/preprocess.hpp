@@ -6,7 +6,7 @@
 
 #include <boost/core/span.hpp>
 
-#include <emp-tool/io/net_io_channel.h>
+#include "ATLab/net-io.hpp"
 
 #include "../authed_bit.hpp"
 #include "../circuit_parser.hpp"
@@ -158,7 +158,7 @@ namespace ATLab {
             ITMacBitKeys beaverTripleKeys;
         };
 
-        PreprocessedData preprocess(emp::NetIO&, const Circuit&);
+        PreprocessedData preprocess(NetIO&, const Circuit&);
     }
 
     namespace Evaluator {
@@ -169,7 +169,7 @@ namespace ATLab {
             ITMacBitKeys beaverTripleKeys;
         };
 
-        PreprocessedData preprocess(emp::NetIO&, const Circuit&);
+        PreprocessedData preprocess(NetIO&, const Circuit&);
     }
 
 }

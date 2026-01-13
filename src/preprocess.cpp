@@ -88,7 +88,7 @@ namespace {
         }
     };
 
-    Matrix<bool> get_matrix(emp::NetIO& io, const size_t n, const size_t L) {
+    Matrix<bool> get_matrix(ATLab::NetIO& io, const size_t n, const size_t L) {
         const size_t blockSize {calc_matrix_blockSize(n, L)}; // TODO: Change to Total_block_count
         std::vector<MatrixBlock> rawData(blockSize);
         if (blockSize != 0) {
@@ -97,7 +97,7 @@ namespace {
         return {n, L, std::move(rawData)};
     }
 
-    Matrix<bool> gen_and_send_matrix(emp::NetIO& io, const size_t n, const size_t L) {
+    Matrix<bool> gen_and_send_matrix(ATLab::NetIO& io, const size_t n, const size_t L) {
         const size_t blockSize {calc_matrix_blockSize(n, L)};
         std::vector<MatrixBlock> rawData(blockSize);
         if (blockSize != 0) {
@@ -264,7 +264,7 @@ namespace ATLab {
     // TODO: Separate circuit-independent and -dependent phases into two functions
 
     namespace Garbler {
-        PreprocessedData preprocess(emp::NetIO& io, const Circuit& circuit) {
+        PreprocessedData preprocess(ATLab::NetIO& io, const Circuit& circuit) {
             const GlobalKeySampling::Garbler globalKey {io};
 
             const size_t evaluatorIndependentWireSize {circuit.andGateSize + circuit.inputSize1};
@@ -442,7 +442,7 @@ BENCHMARK_END(G step 9);
     }
 
     namespace Evaluator {
-        PreprocessedData preprocess(emp::NetIO& io, const Circuit& circuit) {
+        PreprocessedData preprocess(ATLab::NetIO& io, const Circuit& circuit) {
 BENCHMARK_INIT;
             GlobalKeySampling::Evaluator globalKey {io};
             const auto evaluatorIndependentWireSize {circuit.andGateSize + circuit.inputSize1};

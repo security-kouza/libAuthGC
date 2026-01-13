@@ -4,7 +4,7 @@
 #include <array>
 #include <vector>
 
-#include <emp-tool/io/net_io_channel.h>
+#include "ATLab/net-io.hpp"
 #include <emp-tool/utils/f2k.h>
 
 #include "utils.hpp"
@@ -19,7 +19,7 @@ namespace ATLab::DVZK {
         emp::block A0_, A1_;
         std::unique_ptr<emp::PRG> _pChalGen;
     public:
-        Prover(emp::NetIO& io, const BlockCorrelatedOT::Receiver& bCOTReceiver):
+        Prover(ATLab::NetIO& io, const BlockCorrelatedOT::Receiver& bCOTReceiver):
             _authedBlock {ITMacBlocks{bCOTReceiver, 1}},
             A0_ {_authedBlock.get_mac(0, 0)},
             A1_ {_authedBlock.get_block(0)}
@@ -79,7 +79,7 @@ namespace ATLab::DVZK {
         }
 
 
-        void prove(emp::NetIO& io) const noexcept {
+        void prove(ATLab::NetIO& io) const noexcept {
             io.send_data(&A0_, sizeof(A0_));
             io.send_data(&A1_, sizeof(A1_));
         }
@@ -92,7 +92,7 @@ namespace ATLab::DVZK {
         emp::block B_;
         std::unique_ptr<emp::PRG> _pChalGen;
     public:
-        Verifier(emp::NetIO& io, const BlockCorrelatedOT::Sender& bCOTSender):
+        Verifier(ATLab::NetIO& io, const BlockCorrelatedOT::Sender& bCOTSender):
             delta_ {bCOTSender.get_delta(0)},
             _authedBlockKey {ITMacBlockKeys{bCOTSender, 1}},
             B_ {_authedBlockKey.get_local_key(0, 0)}
@@ -116,7 +116,7 @@ namespace ATLab::DVZK {
             xor_to(B_, contribution);
         }
 
-        void verify(emp::NetIO& io) const {
+        void verify(ATLab::NetIO& io) const {
             emp::block A0, A1;
             io.recv_data(&A0, sizeof(A0));
             io.recv_data(&A1, sizeof(A1));
@@ -135,7 +135,7 @@ namespace ATLab::DVZK {
     // proving x[i] y[i] = z[i]
     template<size_t blockSize>
     void prove(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const ITMacBlocks& x,
         const ITMacBlocks& y,
@@ -179,7 +179,7 @@ namespace ATLab::DVZK {
      */
     template <size_t blockSize>
     void verify(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Sender& bCOTSender,
         const ITMacBlockKeys& x,
         const ITMacBlockKeys& y,
@@ -236,7 +236,7 @@ namespace ATLab::DVZK {
      */
     template<size_t blockSize>
     void prove(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const ITMacBits& x,
         const ITMacBlocks& y,
@@ -292,7 +292,7 @@ namespace ATLab::DVZK {
      */
     template <size_t blockSize>
     void verify(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Sender& bCOTSender,
         const ITMacBitKeys& x,
         const ITMacBlockKeys& y,
@@ -342,7 +342,7 @@ namespace ATLab::DVZK {
     }
 
     inline void prove(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Receiver& bCOTReceiver,
         const ITMacBits& x,
         const ITMacBlocks& y,
@@ -391,7 +391,7 @@ namespace ATLab::DVZK {
     }
 
     inline void verify(
-        emp::NetIO& io,
+        ATLab::NetIO& io,
         const BlockCorrelatedOT::Sender& bCOTSender,
         const ITMacBitKeys& x,
         const ITMacBlockKeys& y,

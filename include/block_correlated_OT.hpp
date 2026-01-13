@@ -22,7 +22,7 @@ static_assert(PARTY_INSTANCES_PER_THREAD == 1 || PARTY_INSTANCES_PER_THREAD == 2
 // using IKNP
 namespace ATLab::BlockCorrelatedOT {
 
-    using OT = emp::IKNP<emp::NetIO>;
+    using OT = emp::IKNP<NetIO>;
 
     class Sender {
         const std::vector<emp::block> _deltaArr;
@@ -37,7 +37,7 @@ namespace ATLab::BlockCorrelatedOT {
             return instances;
         }
 
-        static size_t role_index(const emp::NetIO::Role role) {
+        static size_t role_index(const NetIO::Role role) {
             const auto index = static_cast<size_t>(role);
             if (index >= PARTY_INSTANCES_PER_THREAD) {
                 throw std::logic_error{"Unexpected NetIO role index for BlockCorrelatedOT sender"};
@@ -47,7 +47,7 @@ namespace ATLab::BlockCorrelatedOT {
 #endif
 
     public:
-        static OT& Initialize_simple_OT(emp::NetIO& io) {
+        static OT& Initialize_simple_OT(ATLab::NetIO& io) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
 #else
@@ -62,7 +62,7 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-        static OT& Get_simple_OT(const emp::NetIO::Role role) {
+        static OT& Get_simple_OT(const NetIO::Role role) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
 #else
@@ -74,9 +74,9 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-        const emp::NetIO::Role role;
+        const NetIO::Role role;
         const size_t deltaArrSize;
-        Sender(emp::NetIO& io, std::vector<emp::block> deltaArr) :
+        Sender(ATLab::NetIO& io, std::vector<emp::block> deltaArr) :
             _deltaArr(std::move(deltaArr)),
             role {io.role},
             deltaArrSize {_deltaArr.size()}
@@ -126,7 +126,7 @@ namespace ATLab::BlockCorrelatedOT {
             return instances;
         }
 
-        static size_t role_index(const emp::NetIO::Role role) {
+        static size_t role_index(const NetIO::Role role) {
             const auto index = static_cast<size_t>(role);
             if (index >= PARTY_INSTANCES_PER_THREAD) {
                 throw std::logic_error{"Unexpected NetIO role index for BlockCorrelatedOT receiver"};
@@ -136,7 +136,7 @@ namespace ATLab::BlockCorrelatedOT {
 #endif
 
     public:
-        static OT& Initialize_simple_OT(emp::NetIO& io) {
+        static OT& Initialize_simple_OT(ATLab::NetIO& io) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
 #else
@@ -151,7 +151,7 @@ namespace ATLab::BlockCorrelatedOT {
             return *instance;
         }
 
-        static OT& Get_simple_OT(const emp::NetIO::Role role) {
+        static OT& Get_simple_OT(const NetIO::Role role) {
 #if PARTY_INSTANCES_PER_THREAD == 1
             auto& instance = shared_ot_storage();
 #else
@@ -164,9 +164,9 @@ namespace ATLab::BlockCorrelatedOT {
         }
 
         const size_t deltaArrSize; // L
-        const emp::NetIO::Role role;
+        const NetIO::Role role;
 
-        Receiver(emp::NetIO& io, const size_t deltaArrSize) :
+        Receiver(ATLab::NetIO& io, const size_t deltaArrSize) :
             deltaArrSize {deltaArrSize},
             role {io.role}
         {

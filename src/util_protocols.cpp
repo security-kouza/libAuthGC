@@ -10,7 +10,7 @@ namespace ATLab {
      * Send the lower 128 bits to the other party and receive the higher 128 bits
      * Then compare the higher bits. Return `true` if the check passes.
      */
-    bool compare_hash_high(emp::NetIO& io, const void* data, const size_t bytes) {
+    bool compare_hash_high(ATLab::NetIO& io, const void* data, const size_t bytes) {
         const emp::block hashRes {emp::Hash::hash_for_block(data, bytes)};
         const int64_t low = _mm_cvtsi128_si64(hashRes);
         const int64_t high = _mm_extract_epi64(hashRes, 1);
@@ -26,7 +26,7 @@ namespace ATLab {
      * Send the higher 128 bits to the other party and receive the lower 128 bits
      * Then compare the higher bits. Return `true` if the check passes.
      */
-    bool compare_hash_low(emp::NetIO& io, const void* data, const size_t bytes) {
+    bool compare_hash_low(ATLab::NetIO& io, const void* data, const size_t bytes) {
         const emp::block hashRes {emp::Hash::hash_for_block(data, bytes)};
         const int64_t low = _mm_cvtsi128_si64(hashRes);
         const int64_t high = _mm_extract_epi64(hashRes, 1);
@@ -38,7 +38,7 @@ namespace ATLab {
         return low == receivedLow;
     }
 
-    emp::block toss_random_block(emp::NetIO& io) {
+    emp::block toss_random_block(ATLab::NetIO& io) {
         emp::block block;
         THE_GLOBAL_PRNG.random_block(&block, 1);
 

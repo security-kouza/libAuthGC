@@ -47,13 +47,13 @@ TEST(BCOT, DEFAULT) {
 
     std::thread bCOTSenderThread{
                     [&]() {
-                        emp::NetIO io(emp::NetIO::SERVER, ADDRESS, PORT, true);
+                        ATLab::NetIO io(ATLab::NetIO::SERVER, ADDRESS, PORT, true);
                         ATLab::BlockCorrelatedOT::Sender sender(io, deltaArr);
                         localKeys = sender.extend(OT_SIZE);
                     }
                 }, bCOTReceiverThread{
                     [&]() {
-                        emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, PORT, true);
+                        ATLab::NetIO io(ATLab::NetIO::CLIENT, ADDRESS, PORT, true);
                         ATLab::BlockCorrelatedOT::Receiver receiver(io, deltaSize);
                         auto [c, m] = receiver.extend(OT_SIZE);
                         choices = std::move(c);
@@ -98,7 +98,7 @@ TEST(BCOT, MULTI_INSTANCE_REUSES_OT) {
 
     std::thread senderThread{
         [&]() {
-            emp::NetIO io(emp::NetIO::SERVER, ADDRESS, ALT_PORT, true);
+            ATLab::NetIO io(ATLab::NetIO::SERVER, ADDRESS, ALT_PORT, true);
             {
                 auto senderDelta {deltaArr1};
                 ATLab::BlockCorrelatedOT::Sender sender(io, std::move(senderDelta));
@@ -115,7 +115,7 @@ TEST(BCOT, MULTI_INSTANCE_REUSES_OT) {
 
     std::thread receiverThread{
         [&]() {
-            emp::NetIO io(emp::NetIO::CLIENT, ADDRESS, ALT_PORT, true);
+            ATLab::NetIO io(ATLab::NetIO::CLIENT, ADDRESS, ALT_PORT, true);
             {
                 ATLab::BlockCorrelatedOT::Receiver receiver(io, firstDeltaSize);
                 auto [c, m] = receiver.extend(firstLen);
