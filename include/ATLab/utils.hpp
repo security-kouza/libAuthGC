@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <emp-tool/utils/block.h>
 #include <emp-tool/utils/f2k.h>
 
-#include "ATLab/net-io.hpp"
+#include "net-io.hpp"
 
 namespace ATLab {
 

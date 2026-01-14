@@ -4,7 +4,7 @@
 #include <array>
 #include <vector>
 
-#include "ATLab/net-io.hpp"
+#include "net-io.hpp"
 #include <emp-tool/utils/f2k.h>
 
 #include "utils.hpp"

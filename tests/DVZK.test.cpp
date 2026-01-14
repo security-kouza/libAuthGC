@@ -8,11 +8,11 @@
 
 #include <emp-tool/utils/block.h>
 
-#include <DVZK.hpp>
-#include <PRNG.hpp>
-#include <authed_bit.hpp>
-#include <block_correlated_OT.hpp>
-#include <utils.hpp>
+#include <../include/ATLab/DVZK.hpp>
+#include <../include/ATLab/PRNG.hpp>
+#include <ATLab/authed_bit.hpp>
+#include <../include/ATLab/block_correlated_OT.hpp>
+#include <../include/ATLab/utils.hpp>
 #include "test-helper.hpp"
 
 namespace {

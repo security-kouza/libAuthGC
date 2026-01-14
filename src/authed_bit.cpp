@@ -1,6 +1,6 @@
 #include <bitset>
 
-#include "authed_bit.hpp"
+#include "ATLab/authed_bit.hpp"
 
 #include "ATLab/hash_wrapper.h"
 #include "ATLab/util_protocols.hpp"

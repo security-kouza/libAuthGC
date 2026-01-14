@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "PRNG.hpp"
+#include "../include/ATLab/PRNG.hpp"
 
 TEST(PRNG, Default_Seed) {
 #ifdef DEBUG_FIXED_SEED

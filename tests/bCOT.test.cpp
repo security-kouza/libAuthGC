@@ -4,7 +4,7 @@
 #include <thread>
 #include <mutex>
 
-#include <block_correlated_OT.hpp>
+#include <../include/ATLab/block_correlated_OT.hpp>
 
 
 constexpr size_t OT_SIZE {128};

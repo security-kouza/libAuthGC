@@ -9,8 +9,8 @@
 #include <emp-tool/utils/prg.h>
 
 #include <ATLab/2PC_execution.hpp>
-#include <params.hpp>
-#include <utils.hpp>
+#include <../include/ATLab/params.hpp>
+#include <../include/ATLab/utils.hpp>
 
 namespace ATLab {
     namespace {

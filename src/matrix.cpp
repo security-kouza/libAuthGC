@@ -6,7 +6,7 @@
 
 #include <boost/dynamic_bitset.hpp>
 
-#include <authed_bit.hpp>
+#include <ATLab/authed_bit.hpp>
 
 namespace ATLab {
     namespace {

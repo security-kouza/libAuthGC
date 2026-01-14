@@ -12,8 +12,8 @@
 #include "authed_bit.hpp"
 #include "params.hpp"
 #include "block_correlated_OT.hpp"
-#include "ATLab/matrix.hpp"
-#include "ATLab/traits.hpp"
+#include "matrix.hpp"
+#include "traits.hpp"
 
 namespace ATLab {
     class ITMacBlockKeys;

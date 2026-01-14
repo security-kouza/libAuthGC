@@ -25,7 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cassert>
 #endif
 
-#include "EndemicOT/EndemicOT.hpp"
+#include "ATLab/EndemicOT/EndemicOT.hpp"
 
 namespace ATLab::EndemicOT {
 

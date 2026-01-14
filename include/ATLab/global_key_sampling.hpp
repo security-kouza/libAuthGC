@@ -12,7 +12,7 @@
 #include "block_correlated_OT.hpp"
 #include "DVZK.hpp"
 #include "params.hpp"
-#include "ATLab/util_protocols.hpp"
+#include "util_protocols.hpp"
 
 namespace ATLab::GlobalKeySampling {
     // PA

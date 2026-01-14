@@ -10,7 +10,7 @@
 #include <emp-tool/utils/f2k.h>
 #include <emp-tool/utils/utils.h>
 
-#include <authed_bit.hpp>
+#include <ATLab/authed_bit.hpp>
 #include "test-helper.hpp"
 #include "ATLab/hash_wrapper.h"
 

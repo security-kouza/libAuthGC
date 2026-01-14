@@ -8,9 +8,9 @@
 
 #include "ATLab/net-io.hpp"
 
-#include "../authed_bit.hpp"
-#include "../circuit_parser.hpp"
-#include "../params.hpp"
+#include "authed_bit.hpp"
+#include "circuit_parser.hpp"
+#include "params.hpp"
 
 namespace ATLab {
     inline int calc_compression_parameter (const size_t n) {

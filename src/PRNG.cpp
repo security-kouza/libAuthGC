@@ -17,7 +17,7 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "PRNG.hpp"
+#include "../include/ATLab/PRNG.hpp"
 
 #include <cassert>
 #include <fstream>

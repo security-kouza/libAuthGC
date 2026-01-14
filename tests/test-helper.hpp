@@ -1,7 +1,7 @@
 #ifndef ATLab_IT_MAC_CHECK_HPP
 #define ATLab_IT_MAC_CHECK_HPP
 
-#include "../include/authed_bit.hpp"
+#include "../include/ATLab/authed_bit.hpp"
 #include <gtest/gtest.h>
 #include <vector>
 #include <utility>

@@ -31,8 +31,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <gtest/gtest.h>
 
-#include "EndemicOT/EndemicOT.hpp"
-#include "PRNG.hpp"
+#include <ATLab/EndemicOT/EndemicOT.hpp>
+#include <ATLab/PRNG.hpp>
 
 namespace {
     std::ostream& operator<<(std::ostream& out, const ATLab::EndemicOT::DataBlock& data) {

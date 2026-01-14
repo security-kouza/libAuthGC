@@ -4,9 +4,9 @@
 #include <thread>
 #include <mutex>
 
-#include <block_correlated_OT.hpp>
+#include <../include/ATLab/block_correlated_OT.hpp>
 
-#include "global_key_sampling.hpp"
+#include "../include/ATLab/global_key_sampling.hpp"
 
 
 const std::string ADDRESS {"127.0.0.1"};

@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 
 #include "utils.hpp"
-#include "ATLab/matrix.hpp"
+#include "matrix.hpp"
 
 
 namespace ATLab {

@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 #include <sstream>
 
-#include "utils.hpp"
+#include "../include/ATLab/utils.hpp"
 
 TEST(Utils, PrintByte) {
     // Static Test

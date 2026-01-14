@@ -55,15 +55,15 @@ set(SRC
     src/util_protocols.cpp
 )
 set(HEADER
-    include/PRNG.hpp
-    include/utils.hpp
-    include/EndemicOT/Endemic_OT_C.h
-    include/EndemicOT/EndemicOT.hpp
-    include/EndemicOT/OTTools.h
-    include/block_correlated_OT.hpp
-    include/global_key_sampling.hpp
-    include/DVZK.hpp
-    include/circuit_parser.hpp
+    include/ATLab/PRNG.hpp
+    include/ATLab/utils.hpp
+    include/ATLab/EndemicOT/Endemic_OT_C.h
+    include/ATLab/EndemicOT/EndemicOT.hpp
+    include/ATLab/EndemicOT/OTTools.h
+    include/ATLab/block_correlated_OT.hpp
+    include/ATLab/global_key_sampling.hpp
+    include/ATLab/DVZK.hpp
+    include/ATLab/circuit_parser.hpp
     include/ATLab/preprocess.hpp
     include/ATLab/matrix.hpp
     include/ATLab/garble_evaluate.hpp

@@ -5,7 +5,7 @@
 #include <utility>
 
 #include <ATLab/benchmark.hpp>
-#include "global_key_sampling.hpp"
+#include "../include/ATLab/global_key_sampling.hpp"
 
 namespace {
     using namespace ATLab;

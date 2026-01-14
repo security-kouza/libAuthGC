@@ -47,7 +47,7 @@ or substantial portions of the Software.
 #include <indcpa.h>
 #include <symmetric.h>
 
-#include "EndemicOT/OTTools.h"
+#include "ATLab/EndemicOT/OTTools.h"
 
 /**
  * START DEPENDENCIES

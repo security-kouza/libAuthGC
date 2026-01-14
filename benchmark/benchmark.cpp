@@ -5,14 +5,14 @@
 
 #include "ATLab/net-io.hpp"
 
-#include <circuit_parser.hpp>
+#include <../include/ATLab/circuit_parser.hpp>
 #include <ATLab/preprocess.hpp>
 #include <ATLab/garble_evaluate.hpp>
 #include <ATLab/2PC_execution.hpp>
 
 #include <ATLab/benchmark.hpp>
 
-#include "block_correlated_OT.hpp"
+#include "../include/ATLab/block_correlated_OT.hpp"
 
 namespace po = boost::program_options;
 using namespace ATLab;

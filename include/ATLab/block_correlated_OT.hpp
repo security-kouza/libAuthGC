@@ -9,7 +9,6 @@
 #include <emp-tool/utils/block.h>
 #include <emp-ot-original/iknp.h>
 
-#include "EndemicOT/EndemicOT.hpp"
 #include "utils.hpp"
 #include "PRNG.hpp"
 

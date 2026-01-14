@@ -36,11 +36,11 @@ or substantial portions of the Software.
 */
 
 #include <indcpa.h>
-#include "EndemicOT/Endemic_OT_C.h"
+#include "ATLab/EndemicOT/Endemic_OT_C.h"
 
 #include <rng.h>
 
-#include "EndemicOT/OTTools.h"
+#include "ATLab/EndemicOT/OTTools.h"
 
 void gen_receiver_message(NewKyberOTRecver* recver, EndemicOTReceiverMsg* pks) {
     uint8_t pk[PKlength];

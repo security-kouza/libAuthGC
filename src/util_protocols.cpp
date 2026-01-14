@@ -1,7 +1,7 @@
 #include "ATLab/util_protocols.hpp"
 
-#include "params.hpp"
-#include "PRNG.hpp"
+#include "../include/ATLab/params.hpp"
+#include "../include/ATLab/PRNG.hpp"
 #include "emp-tool/utils/crh.h"
 #include "emp-tool/utils/hash.h"
 

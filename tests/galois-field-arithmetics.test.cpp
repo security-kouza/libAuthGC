@@ -6,8 +6,8 @@
 #include <emp-tool/utils/block.h>
 #include <emp-tool/utils/f2k.h>
 
-#include "PRNG.hpp"
-#include "utils.hpp"
+#include "../include/ATLab/PRNG.hpp"
+#include "../include/ATLab/utils.hpp"
 
 namespace {
 constexpr size_t kVectorSize {40};

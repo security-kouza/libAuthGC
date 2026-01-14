@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <circuit_parser.hpp>
+#include <../include/ATLab/circuit_parser.hpp>
 
 #include <vector>
 
